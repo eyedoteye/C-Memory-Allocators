@@ -9,9 +9,9 @@ struct stack
 // Note(sigmasleep): Alignments default to being a footer.
 struct alignment
 {
-  unsigned int Offset : 4;
-  unsigned int LastAlignmentIsHeader : 1;
-  unsigned int Extra : 3; // Note(sigmasleep): Maybe I can pack something cool in here
+  unsigned char Offset : 4;
+  unsigned char LastAlignmentIsHeader : 1;
+  unsigned char Extra : 3; // Note(sigmasleep): Maybe I can pack something cool in here
 };
 
 internal void
