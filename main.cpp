@@ -8,103 +8,155 @@
 
 struct memory
 {
-  size_t Size;
+  unsigned int Size;
   void *AllocatedSpace;
 };
 
-struct stack
+#include "stack_allocator.cpp"
+
+struct list_chunk;
+struct list
 {
   memory Memory;
-  void* TopOfMemory;
-  size_t SpaceRemaining;
-  bool LastAlignmentIsHeader;
+  unsigned int SpaceRemaining;
+  list_chunk *Head;
 };
 
-// Note(sigmasleep): Alignments default to being a footer.
-struct alignment
+struct list_chunk
 {
-  unsigned int Offset : 4;
-  unsigned int LastAlignmentIsHeader : 1;
-  unsigned int Extra : 3; // Note(sigmasleep): Maybe I can pack something cool in here
+  list_chunk *Next;
+  unsigned int Size;
+};
+
+struct allocated_list_header
+{
+  unsigned int Size;
 };
 
 internal void
-InitializeStack(stack *Stack, size_t Size)
+InitializeList(list *List, size_t Size)
 {
-  Stack->Memory.Size = Size;
-  Stack->Memory.AllocatedSpace = malloc(Size);
-  Stack->SpaceRemaining = Size;
-  Stack->TopOfMemory = Stack->Memory.AllocatedSpace;
+  List->Memory.AllocatedSpace = malloc(Size);
+  List->Memory.Size = Size;
+  List->SpaceRemaining = Size;
+  List->Head = (list_chunk *)List->Memory.AllocatedSpace;
+  List->Head->Next = NULL;
+  List->Head->Size = Size;
 }
 
-internal inline void
-_ComputeStackRemainingSpace(stack *Stack)
-{
-  Stack->SpaceRemaining = (size_t)Stack->Memory.AllocatedSpace + Stack->Memory.Size - (size_t)Stack->TopOfMemory;
-}
-
-#define AllocateSpaceOnStack(Stack, Type) AllocateSpaceOnStack_(Stack, sizeof(Type), alignof(Type))
-// Returns NULL if no space is available.
+// Todo (sigmasleep): Alignment
 internal void*
-AllocateSpaceOnStack_(stack *Stack, size_t Size, short Alignment)
+FindAndResizeFittingChunkFromList(list *List, unsigned int Size)
 {
-  short AlignmentOffset = (size_t)Stack->TopOfMemory % Alignment;
+  assert(List->Head != NULL);
 
-  void* Allocation = (void*)((size_t)Stack->TopOfMemory + AlignmentOffset);
+  unsigned int TotalSize = Size + sizeof(allocated_list_header);
 
-  if (Stack->SpaceRemaining < Size + Alignment)
+  if (TotalSize > List->SpaceRemaining)
   {
     return NULL;
   }
 
-  if (AlignmentOffset < sizeof(alignment))
-  {
-    // Note(sigmasleep): This means can't fit alignment struct inbetween last (allocation+alignment struct) and this allocation.  
-    alignment *NewTopOfAlignment = (alignment *)((size_t)Allocation + Size);
-      
-    NewTopOfAlignment->Offset = AlignmentOffset;
-    NewTopOfAlignment->LastAlignmentIsHeader = Stack->LastAlignmentIsHeader;
+  list_chunk *Chunk = List->Head;
+  list_chunk *PreviousChunk = NULL;
 
-    Stack->LastAlignmentIsHeader = false;
+  while (Chunk != NULL && TotalSize > Chunk->Size)
+  {
+    PreviousChunk = Chunk;
+    Chunk = Chunk->Next;
+  }
+
+  if (Chunk == NULL)
+  {
+    return NULL;
+  }
+
+  List->SpaceRemaining -= TotalSize;
+
+  int ChunkSize = Chunk->Size;
+
+  allocated_list_header *AllocatedHeader = (allocated_list_header *) Chunk;
+  AllocatedHeader->Size = ChunkSize;
+
+  if (PreviousChunk == NULL)
+  {
+    // Note(sigmasleep): Head is fitting chunk
+    List->Head = (list_chunk *)((size_t)Chunk + TotalSize);
+    List->Head->Size = ChunkSize - TotalSize;
   }
   else
   {
-    alignment *NewTopOfAlignment = (alignment *)((size_t)Allocation - sizeof(alignment));
-
-    NewTopOfAlignment->Offset = AlignmentOffset;
-    NewTopOfAlignment->LastAlignmentIsHeader = Stack->LastAlignmentIsHeader;
-
-    Stack->LastAlignmentIsHeader = true;
+    PreviousChunk->Next = (list_chunk *)((size_t)Chunk + TotalSize);
+    PreviousChunk->Next->Size = ChunkSize - TotalSize;
   }
 
-  _ComputeStackRemainingSpace(Stack);
-  
-  return Allocation;
+  return (void *)((size_t)Chunk + sizeof(allocated_list_header));
 }
 
-// Note(sigmasleep): Stack must be deallocated in order.
-#define DeallocateSpaceOnStack(Stack, Type) DeallocateSpaceOnStack_(Stack, sizeof(Type))
-internal void
-DeallocateSpaceOnStack_(stack *Stack, size_t Size)
+// Todo(sigmasleep): Add alignment
+#define AllocateSpaceOnList(Stack, Type) AllocateSpaceOnList_(Stack, sizeof(Type))
+internal void*
+AllocateSpaceOnList_(list *List, unsigned int Size)
 {
-  if (Stack->LastAlignmentIsHeader)
-  {
-    alignment *Alignment = (alignment *)((size_t)Stack->TopOfMemory - Size - sizeof(alignment));
+  return FindAndResizeFittingChunkFromList(List, Size);
+}
 
-    Stack->TopOfMemory = (void *)((size_t)Alignment - Alignment->Offset);
-  
-    Stack->LastAlignmentIsHeader = Alignment->LastAlignmentIsHeader;
+#define DeallocateSpaceOnList(List, TypedPointer) DeallocateSpaceOnList_(List, (void *)TypedPointer, sizeof(*TypedPointer))
+internal void
+DeallocateSpaceOnList_(list *List, void* Address, size_t Size)
+{
+  allocated_list_header *Allocation = (allocated_list_header *)((size_t)Address - sizeof(allocated_list_header));
+
+  list_chunk *Chunk = List->Head;
+  list_chunk *PreviousChunk = NULL;
+  while (Chunk != NULL && (size_t)Chunk < (size_t)Allocation)
+  {
+    PreviousChunk = Chunk;
+    Chunk = Chunk->Next;
+  }
+  // Note(sigmasleep): Order of structs: PreviousChunk | Allocation | Chunk
+
+  List->SpaceRemaining += Size;
+
+  bool AllocationIsAdjacentToNextChunk = (size_t)Allocation + Size == (size_t)Chunk;
+  bool AllocationIsAdjacentToPriorChunk = PreviousChunk != NULL &&
+    (size_t)Allocation - PreviousChunk->Size == (size_t)PreviousChunk;
+
+  unsigned int AllocationSize = Size;
+
+  if (!(AllocationIsAdjacentToNextChunk && AllocationIsAdjacentToPriorChunk))
+  {
+    list_chunk *NewChunk = (list_chunk *)Allocation;
+    NewChunk->Size = AllocationSize;
+    NewChunk->Next = Chunk;
+
+    if (PreviousChunk == NULL)
+    {
+      List->Head = NewChunk;
+    }
+    else
+    {
+      PreviousChunk->Next = NewChunk;
+    }
   }
   else
   {
-    alignment *Alignment = (alignment *)((size_t)Stack->TopOfMemory - sizeof(alignment));
-
-    Stack->TopOfMemory = (void *)((size_t)Alignment - Size - Alignment->Offset);
-  
-    Stack->LastAlignmentIsHeader = Alignment->LastAlignmentIsHeader;
+    if (AllocationIsAdjacentToNextChunk)
+    {
+      PreviousChunk->Next = (list_chunk *)Allocation;
+      PreviousChunk->Next->Size = AllocationSize + Chunk->Size;
+      PreviousChunk->Next->Next = Chunk->Next;
+      
+      // Note(sigmasleep): Set up values for: if (AllocationIsAdjacentToPriorChunk)
+      AllocationSize += Chunk->Size;
+      Chunk = Chunk->Next;
+    } 
+    if (AllocationIsAdjacentToPriorChunk)
+    {
+      PreviousChunk->Size += AllocationSize;
+      PreviousChunk->Next = Chunk;
+    }
   }
-
-  _ComputeStackRemainingSpace(Stack);
 }
 
 int main()
@@ -116,6 +168,14 @@ int main()
   printf("Hello\n");
   printf("%i\n", *Test);
   DeallocateSpaceOnStack(&Stack, int);
+
+  list List;
+  InitializeList(&List, 30);
+  Test = (int *)AllocateSpaceOnList(&List, int);
+  *Test = 4;
+  printf("Hello\n");
+  printf("%i\n", *Test);
+  DeallocateSpaceOnList(&List, Test);
 
   return 0;
 }
