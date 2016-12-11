@@ -81,7 +81,7 @@ DeallocateSpaceOnStack_(stack *Stack, size_t Size)
   {
     alignment *Alignment = (alignment *)((size_t)Stack->TopOfMemory - Size - sizeof(alignment));
 
-    Stack->TopOfMemory = (void *)((size_t)Alignment - Alignment->Offset);
+    Stack->TopOfMemory = (void *)((size_t)Alignment - Alignment->Offset + sizeof(alignment));
 
     Stack->LastAlignmentIsHeader = Alignment->LastAlignmentIsHeader;
   }
