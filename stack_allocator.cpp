@@ -52,6 +52,8 @@ AllocateSpaceOnStack_(stack *Stack, size_t Size, short Alignment)
     NewTopOfAlignment->LastAlignmentIsHeader = Stack->LastAlignmentIsHeader;
 
     Stack->LastAlignmentIsHeader = false;
+
+    Stack->TopOfMemory = (void*)((size_t)NewTopOfAlignment + sizeof(alignment));
   }
   else
   {
@@ -61,6 +63,8 @@ AllocateSpaceOnStack_(stack *Stack, size_t Size, short Alignment)
     NewTopOfAlignment->LastAlignmentIsHeader = Stack->LastAlignmentIsHeader;
 
     Stack->LastAlignmentIsHeader = true;
+
+    Stack->TopOfMemory = (void*)((size_t)Allocation + Size);
   }
 
   _ComputeStackRemainingSpace(Stack);
