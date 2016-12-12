@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
+//#ifdef WINDOWS
+#include <windows.h>
 
+//#endif
 #define internal static
 #define global static
 #define local_persist static
@@ -19,26 +22,53 @@ struct memory
 #include <time.h>
 #include <limits.h>
 
-int main()
+static void
+SubtractLargeIntegers(LARGE_INTEGER *X, LARGE_INTEGER *Y, LARGE_INTEGER *Result)
 {
+  Result->HighPart = X->HighPart - Y->HighPart;
+  Result->LowPart = X->LowPart - Y->LowPart;
+
+  //if((Y->LowPart < X->LowPart || Y->LowPart == X->LowPart) && Y->HighPart < X->HighPart
+  //   && Result->LowPart < )
+  //{
+
+  //}
+}
+
+int
+main()
+{
+  LARGE_INTEGER PerformanceCounterFrequency;
+  LARGE_INTEGER OldTime;
+  LARGE_INTEGER NewTime;
+
+  QueryPerformanceFrequency(&PerformanceCounterFrequency);
+
   srand((unsigned int)time(NULL));
-
+#define TestCount 20
   stack Stack;
-  InitializeStack(&Stack, 200);
 
-  char *CharArray[30];
+  QueryPerformanceCounter(&OldTime);
+  InitializeStack(&Stack, TestCount * (sizeof(long)+alignof(long)));
+  QueryPerformanceCounter(&NewTime);
+
+  LARGE_INTEGER StackInitializationTime;
+  SubtractLargeIntegers(&NewTime, &OldTime, &StackInitializationTime);
+
+  unsigned char *CharArray[TestCount];
   int CharArraySize = 0;
-  int *IntArray[30];
+  unsigned int *IntArray[TestCount];
   int IntArraySize = 0;
-  long *LongArray[30];
+  unsigned long *LongArray[TestCount];
   int LongArraySize = 0;
 
-#define TestCount 15
   int TestChoiceOrder[TestCount];
 
   printf("Stack Allocation Starting\n");
   printf("\t\t\tCurrent Top Address: %u\t", (size_t)Stack.TopOfMemory);
   printf("Space Remaining : %d\n", Stack.SpaceRemaining);
+
+  QueryPerformanceCounter(&OldTime);
 
   for(int TestIndex = 0; TestIndex < TestCount; ++TestIndex)
   {
@@ -48,22 +78,25 @@ int main()
     {
       case 0:
       {
-        CharArray[CharArraySize] = (char *)AllocateSpaceOnStack(&Stack, char);
-        *CharArray[CharArraySize] = (char)(rand() % UCHAR_MAX);
+        CharArray[CharArraySize] = (unsigned char *)AllocateSpaceOnStack(&Stack, char);
+        //*CharArray[CharArraySize] = (char)(rand() % UCHAR_MAX);
+        *CharArray[CharArraySize] = (unsigned char)(CharArraySize);
         ++CharArraySize;
         printf("-Allocated(char) \t");
       } break;
       case 1:
       {
-        IntArray[IntArraySize] = (int *)AllocateSpaceOnStack(&Stack, int);
-        *IntArray[IntArraySize] = (int)(rand() % UINT_MAX);
+        IntArray[IntArraySize] = (unsigned int *)AllocateSpaceOnStack(&Stack, int);
+        //*IntArray[IntArraySize] = (int)(rand() % UINT_MAX);
+        *IntArray[IntArraySize] = (unsigned int)(IntArraySize);
         ++IntArraySize;
         printf("-Allocated(int) \t");
       } break;
       case 2:
       {
-        LongArray[LongArraySize] = (long *)AllocateSpaceOnStack(&Stack, long);
-        *LongArray[LongArraySize] = (long)(rand() % ULONG_MAX);
+        LongArray[LongArraySize] = (unsigned long *)AllocateSpaceOnStack(&Stack, long);
+        //*LongArray[LongArraySize] = (long)(rand() % ULONG_MAX);
+        *LongArray[LongArraySize] = (unsigned long)(LongArraySize);
         ++LongArraySize;
         printf("-Allocated(long) \t");
       } break;
@@ -80,20 +113,24 @@ int main()
     }
   }
 
+  QueryPerformanceCounter(&NewTime);
+  LARGE_INTEGER StackAllocationTime;
+  SubtractLargeIntegers(&NewTime, &OldTime, &StackAllocationTime);
+
   printf("\nChars:\n");
   for(int CharArrayIndex = 0; CharArrayIndex < CharArraySize; ++CharArrayIndex)
   {
-    printf("[%i]:%d ", CharArrayIndex, *CharArray[CharArrayIndex]);
+    printf("[%i]:%d\t", CharArrayIndex, *CharArray[CharArrayIndex]);
   }
   printf("\n\nInts:\n");
   for(int IntArrayIndex = 0; IntArrayIndex < IntArraySize; ++IntArrayIndex)
   {
-    printf("[%i]:%d ", IntArrayIndex, *IntArray[IntArrayIndex]);
+    printf("[%i]:%d\t", IntArrayIndex, *IntArray[IntArrayIndex]);
   }
   printf("\n\nLongs:\n");
   for(int LongArrayIndex = 0; LongArrayIndex < LongArraySize; ++LongArrayIndex)
   {
-    printf("[%i]:%d ", LongArrayIndex, *LongArray[LongArrayIndex]);
+    printf("[%i]:%d\t", LongArrayIndex, *LongArray[LongArrayIndex]);
   }
 
   printf("\n\n");
@@ -108,6 +145,9 @@ int main()
   {
     printf("Last Alignment Is Footer\n");
   }
+
+  QueryPerformanceCounter(&OldTime);
+
   for(int TestIndex = TestCount - 1; TestIndex >= 0; --TestIndex)
   {
     switch(TestChoiceOrder[TestIndex])
@@ -139,8 +179,24 @@ int main()
       printf("Last Alignment Is Footer\n");
     }
   }
-  printf("\n\n\n");
   
+
+  QueryPerformanceCounter(&NewTime);
+  LARGE_INTEGER StackDeallocationTime;
+  SubtractLargeIntegers(&NewTime, &OldTime, &StackDeallocationTime);
+
+  //double StackInitializationTimeInMS = (StackInitializationTime * 1000.f) / PerformanceCounterFrequency;
+  //double StackAllocationTimeInMS = (StackAllocationTime * 1000.f) / PerformanceCounterFrequency);
+  //double StackDeallocationTimeInMS = (StackDeallocationTime * 1000.f) / PerformanceCounterFrequency);
+
+
+  printf("Stack Initialization Counter: %u%u\n", StackInitializationTime.HighPart, StackInitializationTime.LowPart);
+  printf("Stack Allocation Counter: %u%u\n", StackAllocationTime.HighPart, StackAllocationTime.LowPart);
+  printf("Stack Deallocation Counter: %u%u\n", StackDeallocationTime.HighPart, StackDeallocationTime.LowPart);
+  printf("QueryPerformanceFrequency: %u%u\n", PerformanceCounterFrequency.HighPart, PerformanceCounterFrequency.LowPart);
+  printf("\n\n\n");
+
+
   list List;
   InitializeList(&List, 30);
   int *Test = (int *)AllocateSpaceOnList(&List, int);
