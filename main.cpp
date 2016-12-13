@@ -190,10 +190,13 @@ main()
   //double StackDeallocationTimeInMS = (StackDeallocationTime * 1000.f) / PerformanceCounterFrequency);
 
 
-  printf("Stack Initialization Counter: %u%u\n", StackInitializationTime.HighPart, StackInitializationTime.LowPart);
-  printf("Stack Allocation Counter: %u%u\n", StackAllocationTime.HighPart, StackAllocationTime.LowPart);
-  printf("Stack Deallocation Counter: %u%u\n", StackDeallocationTime.HighPart, StackDeallocationTime.LowPart);
-  printf("QueryPerformanceFrequency: %u%u\n", PerformanceCounterFrequency.HighPart, PerformanceCounterFrequency.LowPart);
+  printf("Stack Initialization Time: %fms [%u %u]\n", StackInitializationTime.LowPart * 1000.f / PerformanceCounterFrequency.LowPart,
+         StackInitializationTime.HighPart, StackInitializationTime.LowPart);
+  printf("Stack Allocation Time: %fms [%u %u]\n", StackInitializationTime.LowPart * 1000.f / PerformanceCounterFrequency.LowPart,
+         StackAllocationTime.HighPart, StackAllocationTime.LowPart);
+  printf("Stack Deallocation Time: %fms [%u %u]\n", StackInitializationTime.LowPart * 1000.f / PerformanceCounterFrequency.LowPart,
+         StackDeallocationTime.HighPart, StackDeallocationTime.LowPart);
+  printf("QueryPerformanceFrequency: [%u %u]\n", PerformanceCounterFrequency.HighPart, PerformanceCounterFrequency.LowPart);
   printf("\n\n\n");
 
 
