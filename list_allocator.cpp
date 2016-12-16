@@ -1,22 +1,22 @@
-struct list_chunk;
+struct free_list_chunk;
 struct list
 {
   memory Memory;
   unsigned int SpaceRemaining;
-  list_chunk *Head;
+  free_list_chunk *Head;
 };
 
-struct list_chunk
+struct free_list_chunk
 {
-  list_chunk *Next;
+  free_list_chunk *Next;
   unsigned int Size;
-  unsigned char AlignmentOffset;
+  unsigned char Padding;
 };
 
-struct allocated_list_header
+struct allocated_list_chunk
 {
   unsigned int Size;
-  unsigned char AlignmentOffset;
+  unsigned char Padding;
 };
 
 internal void
@@ -25,142 +25,171 @@ InitializeList(list *List, size_t Size)
   List->Memory.AllocatedSpace = malloc(Size);
   List->Memory.Size = Size;
   List->SpaceRemaining = Size;
-  List->Head = (list_chunk *)List->Memory.AllocatedSpace;
+  List->Head = (free_list_chunk *)List->Memory.AllocatedSpace;
   List->Head->Next = NULL;
   List->Head->Size = Size;
+  List->Head->Padding = 0;
+}
+
+internal size_t
+AlignAddress(size_t Address, unsigned char Alignment)
+{
+  assert(Alignment >= 0);
+
+  int AlignmentRemaining = Alignment;
+  int AlignedAddress = Address;
+
+  while (AlignmentRemaining > 0)
+  {
+    AlignmentRemaining /= 2;
+    AlignedAddress = AlignedAddress >> 1;
+  }
+
+  AlignmentRemaining = Alignment;
+
+  while (AlignmentRemaining > 0)
+  {
+    AlignmentRemaining /= 2;
+    AlignedAddress = AlignedAddress << 1;
+  }
+
+  return AlignedAddress;
 }
 
 // Note (sigmasleep): Assumes largest alignment is 8.
 // Assumes no packing on header, therefore if header is aligned, the content is aligned.
 internal void*
-FindAndResizeFittingChunkFromList(list *List, unsigned int Size)
+FindAndResizeFittingChunkFromList(list *List, unsigned int Size, unsigned char Alignment)
 {
-  assert(List->Head != NULL);
-
-  unsigned int TotalSize = Size + sizeof(allocated_list_header);
-  
-  if (TotalSize > List->SpaceRemaining)
+  if (List->Head == NULL)
   {
     return NULL;
   }
 
-  list_chunk *Chunk = List->Head;
-  list_chunk *PreviousChunk = NULL;
+  free_list_chunk *Chunk = List->Head;
 
-  unsigned char AllocationAlignment = alignof(allocated_list_header);
+  size_t FittingChunkAddress = ((size_t)Chunk + Chunk->Size + Chunk->Padding - Size);
+  size_t AlignedFittingChunkAddress = AlignAddress(FittingChunkAddress, Alignment);
 
-  while (Chunk != NULL &&
-    TotalSize + (size_t)Chunk % AllocationAlignment > Chunk->Size + Chunk->AlignmentOffset)
+  size_t HeaderAddress = AlignedFittingChunkAddress - sizeof(allocated_list_chunk);
+  size_t AlignedHeaderAddress = AlignAddress(HeaderAddress, alignof(allocated_list_chunk));
+
+  unsigned int AllocationSize = Size + (FittingChunkAddress - AlignedFittingChunkAddress);
+  unsigned char AllocationPadding = (unsigned char)(AlignedFittingChunkAddress - AlignedHeaderAddress);
+
+  size_t TotalSize = AllocationSize + AllocationPadding;
+
+  while (TotalSize > Chunk->Size)
   {
-    PreviousChunk = Chunk;
     Chunk = Chunk->Next;
-  }
-
-  if (Chunk == NULL)
-  {
-    return NULL;
-  }
-
-  unsigned char AllocationAlignmentOffset = (size_t)Chunk % AllocationAlignment;
-
-  TotalSize += AllocationAlignmentOffset;
+    if (Chunk == NULL)
+    {
+      return NULL;
+    }
   
-  if (TotalSize > List->SpaceRemaining)
-  {
-    return NULL;
+    FittingChunkAddress = ((size_t)Chunk + Chunk->Size - Size);
+    AlignedFittingChunkAddress = AlignAddress(FittingChunkAddress, Alignment);
+
+    HeaderAddress = AlignedFittingChunkAddress - sizeof(allocated_list_chunk);
+    AlignedHeaderAddress = AlignAddress(HeaderAddress, alignof(allocated_list_chunk));
+
+    AllocationSize = Size + (FittingChunkAddress - AlignedFittingChunkAddress);
+    AllocationPadding = (unsigned char)(AlignedFittingChunkAddress - AlignedHeaderAddress);
+    
+    TotalSize = AllocationSize + AllocationPadding;
   }
 
-  int ChunkSize = Chunk->Size;
+  Chunk->Size -= TotalSize;
+  List->SpaceRemaining -= TotalSize;
 
-  allocated_list_header *Allocation = (allocated_list_header *)Chunk;
-  Allocation->Size = ChunkSize;
-  Allocation->AlignmentOffset = AllocationAlignmentOffset;
+  allocated_list_chunk *Allocation = (allocated_list_chunk *)AlignedHeaderAddress;
+  Allocation->Size = AllocationSize;
+  Allocation->Padding = AllocationPadding;
 
-  unsigned char ChunkAlignmentOffset = ((size_t)Chunk + TotalSize) % alignof(list_chunk);
-
-  List->SpaceRemaining -= TotalSize + AllocationAlignmentOffset;
-
-  if (PreviousChunk == NULL)
+  if (List->SpaceRemaining == 0)
   {
-    // Note(sigmasleep): Head is fitting chunk
-    List->Head = (list_chunk *)((size_t)Chunk + TotalSize + ChunkAlignmentOffset);
-    List->Head->Size = ChunkSize - TotalSize - ChunkAlignmentOffset;
-    List->Head->AlignmentOffset = ChunkAlignmentOffset;
-  }
-  else
-  {
-    PreviousChunk->Next = (list_chunk *)((size_t)Chunk + TotalSize + ChunkAlignmentOffset);
-    PreviousChunk->Next->Size = ChunkSize - TotalSize - ChunkAlignmentOffset;
-    PreviousChunk->Next->AlignmentOffset = ChunkAlignmentOffset;
+    List->Head = NULL;
   }
 
-  return (void *)((size_t)Chunk + sizeof(allocated_list_header));
+  return (void *)(AlignedFittingChunkAddress);
+}
+
+internal unsigned int
+GetSizeOfAllocation(void* Address)
+{
+  size_t AllocationAddress = AlignAddress((size_t)Address - sizeof(allocated_list_chunk), alignof(allocated_list_chunk));
+  allocated_list_chunk *Allocation = (allocated_list_chunk *)(AllocationAddress);
+
+  return Allocation->Size;
+}
+
+internal unsigned char
+GetPaddingOfAllocation(void* Address)
+{
+  size_t AllocationAddress = AlignAddress((size_t)Address - sizeof(allocated_list_chunk), alignof(allocated_list_chunk));
+  allocated_list_chunk *Allocation = (allocated_list_chunk *)(AllocationAddress);
+
+  return Allocation->Padding;
 }
 
 // Todo(sigmasleep): Add alignment
-#define AllocateSpaceOnList(Stack, Type) AllocateSpaceOnList_(Stack, sizeof(Type))
+#define AllocateSpaceOnList(Stack, Type) AllocateSpaceOnList_(Stack, sizeof(Type), alignof(Type))
 internal void*
-AllocateSpaceOnList_(list *List, unsigned int Size)
+AllocateSpaceOnList_(list *List, unsigned int Size, unsigned char Alignment)
 {
-  return FindAndResizeFittingChunkFromList(List, Size);
+  return FindAndResizeFittingChunkFromList(List, Size, Alignment);
 }
 
-#define DeallocateSpaceOnList(List, TypedPointer) DeallocateSpaceOnList_(List, (void *)TypedPointer, sizeof(*TypedPointer))
+//#define DeallocateSpaceOnList(List, TypedPointer) DeallocateSpaceOnList_(List, (void *)TypedPointer))
 internal void
-DeallocateSpaceOnList_(list *List, void* Address, size_t Size)
+DeallocateSpaceOnList(list *List, void* Address)
 {
-  allocated_list_header *Allocation = (allocated_list_header *)((size_t)Address - sizeof(allocated_list_header));
+  size_t AllocationAddress = AlignAddress((size_t)Address - sizeof(allocated_list_chunk), alignof(free_list_chunk));
+  allocated_list_chunk *Allocation = (allocated_list_chunk *)(AllocationAddress);
 
-  list_chunk *Chunk = List->Head;
-  list_chunk *PreviousChunk = NULL;
-  while (Chunk != NULL && (size_t)Chunk < (size_t)Allocation)
+  free_list_chunk *Chunk = List->Head;
+  free_list_chunk *PreviousChunk = NULL;
+  
+  while (Chunk != NULL && (size_t)Chunk < AllocationAddress)
   {
     PreviousChunk = Chunk;
     Chunk = Chunk->Next;
   }
   // Note(sigmasleep): Order of structs: PreviousChunk | Allocation | Chunk
-
  
-  bool AllocationIsAdjacentToNextChunk = (size_t)Allocation + Size == (size_t)Chunk;
+  bool AllocationIsAdjacentToNextChunk = (size_t)Allocation + Allocation->Padding + Allocation->Size == (size_t)Chunk;
   bool AllocationIsAdjacentToPriorChunk = PreviousChunk != NULL &&
-    (size_t)Allocation - PreviousChunk->Size == (size_t)PreviousChunk;
+    (size_t)PreviousChunk + PreviousChunk->Padding + PreviousChunk->Size == (size_t)Allocation;
 
-  unsigned int AllocationSize = Size + Allocation->AlignmentOffset;
-  List->SpaceRemaining += AllocationSize;
+  //unsigned int AllocationSize = Size + Allocation->Padding;
+  //List->SpaceRemaining += AllocationSize;
 
   if (!(AllocationIsAdjacentToNextChunk && AllocationIsAdjacentToPriorChunk))
   {
-    unsigned char ChunkAlignmentOffset = (size_t)Allocation % alignof(list_chunk);
-    
-    list_chunk *NewChunk = (list_chunk *)((size_t)Allocation + ChunkAlignmentOffset);
+    /*free_list_chunk *NewChunk = (free_list_chunk *)((size_t)Allocation + ChunkPadding);
     NewChunk->Size = AllocationSize;
-    NewChunk->AlignmentOffset = ChunkAlignmentOffset;
-    NewChunk->Next = Chunk;
-
-    if (PreviousChunk == NULL)
-    {
-      List->Head = NewChunk;
-    }
-    else
-    {
-      PreviousChunk->Next = NewChunk;
-    }
+    NewChunk->Padding = ChunkPadding;
+    NewChunk->Next = Chunk;*/
   }
   else
   {
     if (AllocationIsAdjacentToNextChunk)
     {
-      PreviousChunk->Next = (list_chunk *)Allocation;
-      PreviousChunk->Next->Size = AllocationSize + Chunk->Size;
-      PreviousChunk->Next->Next = Chunk->Next;
+      size_t NewFreeChunkAddress = (size_t)Address - sizeof(allocated_list_chunk);
+      size_t AlignedNewFreeChunkAddress = AlignAddress(NewFreeChunkAddress, alignof(free_list_chunk));
 
-      // Note(sigmasleep): Sets up values for: if (AllocationIsAdjacentToPriorChunk)
-      AllocationSize += Chunk->Size;
+      PreviousChunk->Next = (free_list_chunk *)AlignedNewFreeChunkAddress;
+      PreviousChunk->Next->Size = Allocation->Size + Chunk->Size + Chunk->Padding;
+      PreviousChunk->Next->Next = Chunk->Next;
+      PreviousChunk->Next->Padding = (size_t)Address - AlignedNewFreeChunkAddress == NULL;
+
+     // Note(sigmasleep): Sets up values for: if (AllocationIsAdjacentToPriorChunk)
+     // AllocationSize += Chunk->Size;
       Chunk = Chunk->Next;
     }
     if (AllocationIsAdjacentToPriorChunk)
     {
-      PreviousChunk->Size += AllocationSize;
+      PreviousChunk->Size += Allocation->Size + Allocation->Padding;//AllocationSize;
       PreviousChunk->Next = Chunk;
     }
   }
