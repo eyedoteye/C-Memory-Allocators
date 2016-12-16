@@ -34,12 +34,12 @@ InitializeList(list *List, size_t Size)
 internal size_t
 AlignAddress(size_t Address, unsigned char Alignment)
 {
-  assert(Alignment >= 0);
+  assert(Alignment > 0);
 
   int AlignmentRemaining = Alignment;
   int AlignedAddress = Address;
 
-  while (AlignmentRemaining > 0)
+  while (AlignmentRemaining > 1)
   {
     AlignmentRemaining /= 2;
     AlignedAddress = AlignedAddress >> 1;
@@ -47,7 +47,7 @@ AlignAddress(size_t Address, unsigned char Alignment)
 
   AlignmentRemaining = Alignment;
 
-  while (AlignmentRemaining > 0)
+  while (AlignmentRemaining > 1)
   {
     AlignmentRemaining /= 2;
     AlignedAddress = AlignedAddress << 1;
