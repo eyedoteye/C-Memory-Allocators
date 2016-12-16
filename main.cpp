@@ -207,7 +207,7 @@ main()
 
   for (int TestIndex = 0; TestIndex < TestCount; ++TestIndex)
   {
-    int TestChoice = rand() % 3;
+    int TestChoice = 0;//rand() % 3;
 
     switch (TestChoice)
     {
@@ -271,11 +271,11 @@ main()
     printf("[%i]:%d\t", LongArrayIndex, *LongArray[LongArrayIndex]);
   }
 
-  printf("\n");
+  printf("\n\n");
 
   for (int TestIndex = TestCount - 1; TestIndex >= 0; --TestIndex)
   {
-    int TestChoice = rand() % 3;
+    int TestChoice = 0;//rand() % 3;
     
     switch (TestChoice)
     {
@@ -283,31 +283,33 @@ main()
       {
         if (CharArraySize > 0)
         {
-          DeallocateSpaceOnList(&List, &CharArray[CharArraySize]);
+          DeallocateSpaceOnList(&List, CharArray[CharArraySize-1]);
           CharArraySize--;
           printf("-Deallocated(char)\t");
+          printf("Space Remaining : %d\n", List.SpaceRemaining);
         }
       } break;
       case 1:
       {
         if (IntArraySize > 0)
         {
-          DeallocateSpaceOnList(&List, &IntArray[IntArraySize]);
+          DeallocateSpaceOnList(&List, IntArray[IntArraySize-1]);
           IntArraySize--;
           printf("-Deallocated(int)\t");
+          printf("Space Remaining : %d\n", List.SpaceRemaining);
         }
       } break;
       case 2:
       {
         if (LongArraySize > 0)
         {
-          DeallocateSpaceOnList(&List, &LongArray[LongArraySize]);
+          DeallocateSpaceOnList(&List, LongArray[LongArraySize-1]);
           LongArraySize--;
           printf("-Deallocated(long)\t");
+          printf("Space Remaining : %d\n", List.SpaceRemaining);
         }
       } break;
     }
-    printf("Space Remaining : %d\n", List.SpaceRemaining);
   }
 
   return 0;
