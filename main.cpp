@@ -207,7 +207,7 @@ main()
 
   for (int TestIndex = 0; TestIndex < TestCount; ++TestIndex)
   {
-    int TestChoice = 0;//rand() % 3;
+    int TestChoice = rand() % 3;
 
     switch (TestChoice)
     {
@@ -273,9 +273,9 @@ main()
 
   printf("\n\n");
 
-  for (int TestIndex = TestCount - 1; TestIndex >= 0; --TestIndex)
+  while(CharArraySize > 0 || IntArraySize > 0 || LongArraySize > 0)
   {
-    int TestChoice = 0;//rand() % 3;
+    int TestChoice = rand() % 3;
     
     switch (TestChoice)
     {
