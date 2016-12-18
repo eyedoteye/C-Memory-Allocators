@@ -10,13 +10,13 @@ struct free_list_chunk
 {
   free_list_chunk *Next;
   unsigned int Size;
-  unsigned char Padding;
+  signed char Padding;
 };
 
 struct allocated_list_chunk
 {
   unsigned int Size;
-  unsigned char Padding;
+  signed char Padding;
 };
 
 internal void
@@ -36,24 +36,14 @@ AlignAddress(size_t Address, unsigned char Alignment)
 {
   assert(Alignment > 0);
 
-  int AlignmentRemaining = Alignment;
-  int AlignedAddress = Address;
+  int AlignmentShift = Alignment;
 
-  while (AlignmentRemaining > 1)
+  while (AlignmentShift > 1)
   {
-    AlignmentRemaining /= 2;
-    AlignedAddress = AlignedAddress >> 1;
+    AlignmentShift /= 2;
   }
 
-  AlignmentRemaining = Alignment;
-
-  while (AlignmentRemaining > 1)
-  {
-    AlignmentRemaining /= 2;
-    AlignedAddress = AlignedAddress << 1;
-  }
-
-  return AlignedAddress;
+  return (Address >> AlignmentShift) << AlignmentShift;
 }
 
 // Note (sigmasleep): Assumes largest alignment is 8.
@@ -174,34 +164,37 @@ DeallocateSpaceOnList(list *List, void* Address)
   //unsigned int AllocationSize = Size + Allocation->Padding;
   //List->SpaceRemaining += AllocationSize;
 
-  if (!(AllocationIsAdjacentToNextChunk || AllocationIsAdjacentToPriorChunk))
+  if (!AllocationIsAdjacentToNextChunk && !AllocationIsAdjacentToPriorChunk)
   {
-    size_t NewFreeChunkAddress = (size_t)Address - sizeof(free_list_chunk);
+    size_t NewFreeChunkAddress = (size_t)Allocation; // (size_t)Address - sizeof(allocated_list_chunk);
     size_t AlignedNewFreeChunkAddress = AlignAddress(NewFreeChunkAddress, alignof(free_list_chunk));
     
     free_list_chunk *NewChunk = (free_list_chunk *)((size_t)AlignedNewFreeChunkAddress);
 
     unsigned int AllocationTotalSize = Allocation->Size + Allocation->Padding;
 
-    NewChunk->Padding = (unsigned char)(NewFreeChunkAddress - AlignedNewFreeChunkAddress);
+    NewChunk->Padding = (signed char)(NewFreeChunkAddress - AlignedNewFreeChunkAddress);
     NewChunk->Size = AllocationTotalSize - NewChunk->Padding;
     NewChunk->Next = Chunk;
 
     PreviousChunk->Next = NewChunk;
-    List->SpaceRemaining += NewChunk->Size + NewChunk->Padding;
+    List->SpaceRemaining += NewChunk->Size;
   }
   else
   {
     unsigned int NewFreeChunkSize = Allocation->Size + Allocation->Padding;
-    unsigned char NewFreeChunkPadding = 0;
+    signed char NewFreeChunkPadding = 0;
     
     if (AllocationIsAdjacentToNextChunk)
     {
       size_t NewFreeChunkAddress = (size_t)Address - sizeof(free_list_chunk);
-      size_t AlignedNewFreeChunkAddress = AlignAddress(NewFreeChunkAddress, alignof(free_list_chunk));
+      size_t AlignedNewFreeChunkAddress = AlignAddress(NewFreeChunkAddress + alignof(free_list_chunk) - 1,
+                                                       alignof(free_list_chunk));
 
-      NewFreeChunkSize = Chunk->Size + Chunk->Padding + Allocation->Size;
-      NewFreeChunkPadding = (unsigned char)(NewFreeChunkAddress - AlignedNewFreeChunkAddress);
+      NewFreeChunkSize = Chunk->Size + Chunk->Padding + Allocation->Size
+        - (AlignedNewFreeChunkAddress - NewFreeChunkAddress);
+
+      NewFreeChunkPadding = (signed char)(NewFreeChunkAddress - AlignedNewFreeChunkAddress);
 
       PreviousChunk->Next = (free_list_chunk *)AlignedNewFreeChunkAddress;
       PreviousChunk->Next->Size = NewFreeChunkSize;
