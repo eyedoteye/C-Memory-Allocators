@@ -37,19 +37,19 @@ struct memory
 //  printf("Offset : %u\t", GetPaddingOfFreeChunk(Address));
 //}
 
-//internal void
-//PrintList(list *List)
-//{
-//  free_list_header *Chunk = List->Head;
-//
-//  while(Chunk != NULL)
-//  {
-//    printf("Chunk Address:%u\t", (size_t)Chunk);
-//    printf("ChunkSize Deallocated : %u\t", Chunk->ChunkSize);
-//    printf("Offset : %u\n", Chunk->Offset);
-//    Chunk = Chunk->Next;
-//  }
-//}
+internal void
+PrintList(list *List)
+{
+  free_list_header *Chunk = List->Head;
+
+  while(Chunk != NULL)
+  {
+    printf("Chunk Address:%u\t", (size_t)Chunk);
+    printf("ChunkSize Deallocated : %u\t", Chunk->ChunkSize);
+    printf("Offset : %u\n", Chunk->Offset);
+    Chunk = Chunk->Next;
+  }
+}
 
 internal void
 SubtractLargeIntegers(LARGE_INTEGER *X, LARGE_INTEGER *Y, LARGE_INTEGER *Result)
@@ -318,7 +318,7 @@ main()
 
 
   list List;
-  InitializeList(&List, 30);
+  InitializeList(&List, 13 * 3);
   printf("Space Remaining : %d\n", List.SpaceRemaining);
 
   
@@ -338,15 +338,15 @@ main()
   printf("Space Remaining : %d\n", List.SpaceRemaining);
 
   DeallocateSpaceOnList(&List, CharArray[0]);
-  //PrintList(&List);
+  PrintList(&List);
   printf("Space Remaining : %d\n", List.SpaceRemaining);
 
   DeallocateSpaceOnList(&List, CharArray[2]);
-  //PrintList(&List);
+  PrintList(&List);
   printf("Space Remaining : %d\n", List.SpaceRemaining);
 
   DeallocateSpaceOnList(&List, CharArray[1]);
-  //PrintDeallocationInfo(CharArray[1]);
+  PrintList(&List);
   printf("Space Remaining : %d\n", List.SpaceRemaining);
 
 

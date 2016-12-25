@@ -35,7 +35,7 @@ AlignAddress(size_t Address, unsigned char Alignment)
 
   int AlignmentShift = Alignment;
 
-  while(AlignmentShift > 1)
+  while(AlignmentShift > 0)
   {
     AlignmentShift /= 2;
   }
@@ -161,7 +161,7 @@ FindAndResizeFittingChunkFromList(list *List, unsigned int RequestedSize, unsign
 
   allocated_list_header *AllocatedHeader = (allocated_list_header *)PotentialAllocatedHeaderProperties.Address;
   AllocatedHeader->PrePadding = PotentialAllocatedHeaderProperties.PrePadding; 
-  AllocatedHeader->ChunkSize = PotentialAllocatedHeaderProperties.ChunkSize;
+  AllocatedHeader->ChunkSize = RequestedSize;
 
   allocated_list_header_post_padding *AllocatedHeaderPostPadding = (allocated_list_header_post_padding *)
 	  (AllocatedChunkAddress - sizeof(allocated_list_header_post_padding));
@@ -213,7 +213,7 @@ DeallocateSpaceOnList(list *List, void* Address)
 
 
 
-  unsigned int NewFreeHeaderChunkSize = AllocatedHeader->PrePadding + sizeof(AllocatedHeader)
+  unsigned int NewFreeHeaderChunkSize = AllocatedHeader->PrePadding + sizeof(allocated_list_header)
     + *AllocatedHeaderPostPadding + AllocatedHeader->ChunkSize;
   size_t NewFreeHeaderChunkAddress = (size_t)AllocatedHeader - AllocatedHeader->PrePadding;
   size_t NewFreeHeaderAddress = AlignAddress(NewFreeHeaderChunkAddress + alignof(free_list_header)-1,
