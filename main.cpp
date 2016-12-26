@@ -30,7 +30,7 @@ PrintAllocationInfo(void *Address)
 	printf("AllocatedHeader Address:%u\t", AllocatedHeaderProperties.Address);
   printf("ChunkSize Allocated: %u\t", AllocatedHeaderProperties.ChunkSize);
 	printf("PrePadding: %u\t", AllocatedHeaderProperties.PrePadding);
-	printf("PostPadding: %u\t", AllocatedHeaderProperties.PostPadding);
+	printf("PostPadding: %u\n", AllocatedHeaderProperties.PostPadding);
 }
 //
 //internal void
@@ -322,7 +322,7 @@ main()
 
 
   list List;
-  InitializeList(&List, 13 * 3);
+  InitializeList(&List, 34);
 	PrintList(&List);
   printf("Space Remaining : %d\n", List.SpaceRemaining);
   
