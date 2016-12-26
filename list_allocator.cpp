@@ -14,7 +14,7 @@ struct free_list_header
 {
   free_list_header *Next;
   unsigned int ChunkSize;
-  signed char Offset;
+  unsigned char Offset;
 };
 
 struct allocated_list_header
@@ -33,14 +33,15 @@ AlignAddress(size_t Address, unsigned char Alignment)
 {
   assert(Alignment > 0);
 
-  int AlignmentShift = Alignment;
+	int Shift = 0;
 
-  while(AlignmentShift > 0)
+  while(Alignment > 1)
   {
-    AlignmentShift /= 2;
+    Alignment /= 2;
+		Shift += 1;
   }
 
-  return (Address >> AlignmentShift) << AlignmentShift;
+  return (Address >> Shift) << Shift;
 }
 
 // Note(sigmasleep): This struct groups together the return values for the GetAllocatedHeaderFromFreeHeader method.
@@ -56,7 +57,7 @@ internal void
 GetAllocatedHeaderFromFreeHeader(allocated_list_header_properties *AllocatedHeaderProperties,
                                  free_list_header *FreeHeader, unsigned char RequiredAlignment)
 {
-  size_t BaseAddress = (size_t)FreeHeader + FreeHeader->Offset;
+  size_t BaseAddress = (size_t)FreeHeader - FreeHeader->Offset;
   size_t AllocatedHeaderAddress = AlignAddress(BaseAddress + alignof(allocated_list_header) - 1,
                                                alignof(allocated_list_header));
   size_t ChunkAddress = AlignAddress(AllocatedHeaderAddress + sizeof(allocated_list_header) + sizeof(allocated_list_header_post_padding) + RequiredAlignment - 1,
@@ -139,7 +140,7 @@ FindAndResizeFittingChunkFromList(list *List, unsigned int RequestedSize, unsign
 
     free_list_header *NextFreeHeader = FreeHeader->Next;
     size_t UpdatedChunkSize = FreeHeader->ChunkSize - RequiredSize;
-    signed char UpdatedOffset = signed char(UpdatedFreeHeaderAddress - UpdatedFreeChunkAddress);
+    unsigned char UpdatedOffset = unsigned char(UpdatedFreeHeaderAddress - UpdatedFreeChunkAddress);
 
     if(PreviousFreeHeader == NULL)
     {
@@ -221,21 +222,20 @@ DeallocateSpaceOnList(list *List, void* Address)
 
   // Note(sigmasleep): Order of structs: PreviousFreeHeader | AllocatedHeader | FreeHeader
  
-  bool AllocationIsAdjacentToNextChunk =
-    (size_t)AllocatedHeader + *AllocatedHeaderPostPadding + AllocatedHeader->ChunkSize == (size_t)FreeHeader;
-  bool AllocationIsAdjacentToPriorChunk = PreviousFreeHeader != NULL &&
-    (size_t)PreviousFreeHeader + PreviousFreeHeader->ChunkSize == (size_t)AllocatedHeader;
-
-
+  bool AllocationIsAdjacentToNextFreeHeader = FreeHeader != NULL && 
+		(size_t)Address + AllocatedHeader->ChunkSize + FreeHeader->Offset == (size_t)FreeHeader;
+  bool AllocationIsAdjacentToPriorFreeHeader = PreviousFreeHeader != NULL &&
+    (size_t)PreviousFreeHeader - PreviousFreeHeader->Offset + PreviousFreeHeader->ChunkSize
+		== (size_t)AllocatedHeader - AllocatedHeader->PrePadding;
 
   unsigned int NewFreeHeaderChunkSize = AllocatedHeader->PrePadding + sizeof(allocated_list_header)
     + *AllocatedHeaderPostPadding + AllocatedHeader->ChunkSize;
   size_t NewFreeHeaderChunkAddress = (size_t)AllocatedHeader - AllocatedHeader->PrePadding;
   size_t NewFreeHeaderAddress = AlignAddress(NewFreeHeaderChunkAddress + alignof(free_list_header)-1,
                                              alignof(free_list_header));
-  signed char NewFreeHeaderOffset = (signed char)(NewFreeHeaderAddress - NewFreeHeaderChunkAddress);
+  unsigned char NewFreeHeaderOffset = (unsigned char)(NewFreeHeaderAddress - NewFreeHeaderChunkAddress);
 
-  if (!AllocationIsAdjacentToNextChunk && !AllocationIsAdjacentToPriorChunk)
+  if (!AllocationIsAdjacentToNextFreeHeader && !AllocationIsAdjacentToPriorFreeHeader)
   {
     free_list_header *NewFreeListHeader = (free_list_header *)(NewFreeHeaderAddress);
     
@@ -254,7 +254,7 @@ DeallocateSpaceOnList(list *List, void* Address)
   }
   else
   {    
-    if (AllocationIsAdjacentToNextChunk)
+    if (AllocationIsAdjacentToNextFreeHeader)
     {
       PreviousFreeHeader->Next = (free_list_header *)NewFreeHeaderAddress;
       PreviousFreeHeader->Next->ChunkSize = NewFreeHeaderChunkSize;
@@ -264,7 +264,7 @@ DeallocateSpaceOnList(list *List, void* Address)
       // Note(sigmasleep): Sets up values for: if (AllocationIsAdjacentToPriorChunk)
       FreeHeader = FreeHeader->Next;
     }
-    if (AllocationIsAdjacentToPriorChunk)
+    if (AllocationIsAdjacentToPriorFreeHeader)
     {
       PreviousFreeHeader->ChunkSize += NewFreeHeaderChunkSize;
       // Note(sigmasleep): The following line is for merging with an allocated header

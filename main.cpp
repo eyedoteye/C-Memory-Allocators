@@ -323,21 +323,25 @@ main()
 
   list List;
   InitializeList(&List, 13 * 3);
+	PrintList(&List);
   printf("Space Remaining : %d\n", List.SpaceRemaining);
   
   CharArray[0] = (unsigned char *)AllocateSpaceOnList(&List, char);
   *CharArray[0] = 0;
   PrintAllocationInfo(CharArray[0]);
+	PrintList(&List);
   printf("Space Remaining: %d\n", List.SpaceRemaining);
 
   CharArray[1] = (unsigned char *)AllocateSpaceOnList(&List, char);
   *CharArray[1] = 1;
   PrintAllocationInfo(CharArray[1]);
+	PrintList(&List);
   printf("Space Remaining: %d\n", List.SpaceRemaining);
 
   CharArray[2] = (unsigned char *)AllocateSpaceOnList(&List, char);
   *CharArray[2] = 2;
   PrintAllocationInfo(CharArray[2]);
+	PrintList(&List);
   printf("Space Remaining: %d\n", List.SpaceRemaining);
 
   DeallocateSpaceOnList(&List, CharArray[0]);
