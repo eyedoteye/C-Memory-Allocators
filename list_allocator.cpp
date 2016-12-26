@@ -187,6 +187,21 @@ GetAllocatedHeaderAddress(list List, size_t ChunkAddress)
 }
 
 internal void
+GetAllocatedHeaderFromAllocatedChunk(allocated_list_header_properties *AllocatedHeaderProperties, size_t ChunkAddress)
+{
+	allocated_list_header_post_padding *AllocatedHeaderPostPadding =
+		(allocated_list_header_post_padding *)((size_t)ChunkAddress - sizeof(allocated_list_header_post_padding));
+
+	allocated_list_header *AllocatedHeader =
+		(allocated_list_header *)((size_t)ChunkAddress - *AllocatedHeaderPostPadding - sizeof(allocated_list_header));
+
+	AllocatedHeaderProperties->Address = (size_t)AllocatedHeader;
+	AllocatedHeaderProperties->ChunkSize = AllocatedHeader->ChunkSize;
+	AllocatedHeaderProperties->PrePadding = AllocatedHeader->PrePadding;
+	AllocatedHeaderProperties->PostPadding = *AllocatedHeaderPostPadding;
+}
+
+internal void
 DeallocateSpaceOnList(list *List, void* Address)
 {
   allocated_list_header_post_padding *AllocatedHeaderPostPadding = 
@@ -234,7 +249,7 @@ DeallocateSpaceOnList(list *List, void* Address)
     }
     else
     {
-      PreviousFreeHeader->Next = FreeHeader;
+      PreviousFreeHeader->Next = NewFreeListHeader;
     }
   }
   else
