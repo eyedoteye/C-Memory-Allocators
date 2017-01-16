@@ -9,7 +9,6 @@
 #define global static
 #define local_persist static
 
-
 struct memory
 {
   unsigned int Size;
@@ -235,9 +234,7 @@ main()
         }
       } break;
       case 1:
-      {
-        
-        
+      {        
         if (Allocate || IntArraySize == 0)
         {
           IntArray[IntArraySize] = (unsigned int *)AllocateSpaceOnList(&List, int);
@@ -287,6 +284,29 @@ main()
 
   printf("\nSpace Remaining : %d\n", List.SpaceRemaining);
 
+  while (CharArraySize > 0)
+  {
+    DeallocateSpaceOnList(&List, CharArray[CharArraySize - 1]);
+    printf("-Deallocated(char): %u\t", *CharArray[CharArraySize - 1]);
+    printf("Space Remaining : %d\n", List.SpaceRemaining);
+    --CharArraySize;
+  }
+
+  while (IntArraySize > 0)
+  {
+    DeallocateSpaceOnList(&List, IntArray[IntArraySize - 1]);
+    printf("-Deallocated(int): %u\t", *IntArray[IntArraySize - 1]);
+    printf("Space Remaining : %d\n", List.SpaceRemaining);
+    --IntArraySize;
+  }
+
+  while (LongArraySize > 0)
+  {
+    DeallocateSpaceOnList(&List, LongArray[LongArraySize - 1]);
+    printf("-Deallocated(long): %u\t", *LongArray[LongArraySize - 1]);
+    printf("Space Remaining : %d\n", List.SpaceRemaining);
+    --LongArraySize;
+  }
 
   return 0;
 }
