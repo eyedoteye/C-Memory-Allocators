@@ -7,12 +7,12 @@ struct list
 {
   memory Memory;
   size_t SpaceRemaining;
-  free_list_chunk *Head;
+  free_list_header *Head;
 };
 
 struct free_list_header
 {
-  free_list_chunk *Next;
+  free_list_header *Next;
   size_t ChunkSize;
   unsigned char Offset;
 };
