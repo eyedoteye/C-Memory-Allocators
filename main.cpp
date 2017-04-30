@@ -11,7 +11,7 @@
 
 struct memory
 {
-  unsigned int Size;
+  size_t Size;
   void *AllocatedSpace;
 };
 
@@ -21,17 +21,24 @@ struct memory
 #include <time.h>
 #include <limits.h>
 
-static void
-SubtractLargeIntegers(LARGE_INTEGER *X, LARGE_INTEGER *Y, LARGE_INTEGER *Result)
+
+internal void
+SubtractLargeIntegers(
+  LARGE_INTEGER *X,
+  LARGE_INTEGER *Y,
+  LARGE_INTEGER *Difference)
 {
-  Result->HighPart = X->HighPart - Y->HighPart;
-  Result->LowPart = X->LowPart - Y->LowPart;
+  Difference->QuadPart = X->QuadPart - Y->QuadPart;
+}
 
-  //if((Y->LowPart < X->LowPart || Y->LowPart == X->LowPart) && Y->HighPart < X->HighPart
-  //   && Result->LowPart < )
-  //{
-
-  //}
+internal void 
+DivideLargeIntegers(
+  LARGE_INTEGER *X,
+  LARGE_INTEGER *Y,
+  LARGE_INTEGER *Quotient,
+  int Scale)
+{
+  Quotient->QuadPart = X->QuadPart * Scale / Y->QuadPart;
 }
 
 int
@@ -64,8 +71,8 @@ main()
   int TestChoiceOrder[TestCount];
 
   printf("Stack Allocation Starting\n");
-  printf("\t\t\tCurrent Top Address: %u\t", (size_t)Stack.TopOfMemory);
-  printf("Space Remaining : %d\n", Stack.SpaceRemaining);
+  printf("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+  printf("Space Remaining : %zu\n", Stack.SpaceRemaining);
 
   QueryPerformanceCounter(&OldTime);
 
@@ -78,7 +85,6 @@ main()
       case 0:
       {
         CharArray[CharArraySize] = (unsigned char *)AllocateSpaceOnStack(&Stack, char);
-        //*CharArray[CharArraySize] = (char)(rand() % UCHAR_MAX);
         *CharArray[CharArraySize] = (unsigned char)(CharArraySize);
         ++CharArraySize;
         printf("-Allocated(char) \t");
@@ -86,7 +92,6 @@ main()
       case 1:
       {
         IntArray[IntArraySize] = (unsigned int *)AllocateSpaceOnStack(&Stack, int);
-        //*IntArray[IntArraySize] = (int)(rand() % UINT_MAX);
         *IntArray[IntArraySize] = (unsigned int)(IntArraySize);
         ++IntArraySize;
         printf("-Allocated(int) \t");
@@ -94,14 +99,13 @@ main()
       case 2:
       {
         LongArray[LongArraySize] = (unsigned long *)AllocateSpaceOnStack(&Stack, long);
-        //*LongArray[LongArraySize] = (long)(rand() % ULONG_MAX);
         *LongArray[LongArraySize] = (unsigned long)(LongArraySize);
         ++LongArraySize;
         printf("-Allocated(long) \t");
       } break;
     }
-    printf("Current Top Address: %u\t", (size_t)Stack.TopOfMemory);
-    printf("Space Remaining : %d\t", Stack.SpaceRemaining);
+    printf("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+    printf("Space Remaining : %zu\t", Stack.SpaceRemaining);
     if(Stack.LastAlignmentIsHeader)
     {
       printf("Last Alignment Is Header\n");
@@ -134,8 +138,8 @@ main()
 
   printf("\n\n");
   printf("Stack Deallocation Starting\n");
-  printf("\t\t\tCurrent Top Address: %u\t", (size_t)Stack.TopOfMemory);
-  printf("Space Remaining : %d\t", Stack.SpaceRemaining);
+  printf("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+  printf("Space Remaining : %zu\t", Stack.SpaceRemaining);
   if(Stack.LastAlignmentIsHeader)
   {
     printf("Last Alignment Is Header\n");
@@ -167,8 +171,8 @@ main()
         printf("-Deallocated(long)\t");
       } break;
     }
-    printf("Current Top Address: %u\t", (size_t)Stack.TopOfMemory);
-    printf("Space Remaining : %d\t", Stack.SpaceRemaining);
+    printf("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+    printf("Space Remaining : %zu\t", Stack.SpaceRemaining);
     if(Stack.LastAlignmentIsHeader)
     {
       printf("Last Alignment Is Header\n");
@@ -183,130 +187,140 @@ main()
   LARGE_INTEGER StackDeallocationTime;
   SubtractLargeIntegers(&NewTime, &OldTime, &StackDeallocationTime);
 
-  //double StackInitializationTimeInMS = (StackInitializationTime * 1000.f) / PerformanceCounterFrequency;
-  //double StackAllocationTimeInMS = (StackAllocationTime * 1000.f) / PerformanceCounterFrequency);
-  //double StackDeallocationTimeInMS = (StackDeallocationTime * 1000.f) / PerformanceCounterFrequency);
+  LARGE_INTEGER StackInitializationTimeInNS;
+  DivideLargeIntegers(&StackInitializationTime, &PerformanceCounterFrequency,
+                      &StackInitializationTimeInNS,
+                      1000 * 1000);
+  LARGE_INTEGER StackAllocationTimeInNS;
+  DivideLargeIntegers(&StackAllocationTime, &PerformanceCounterFrequency,
+                      &StackAllocationTimeInNS,
+                      1000 * 1000);
+  LARGE_INTEGER StackDeallocationTimeInNS;
+  DivideLargeIntegers(&StackDeallocationTime, &PerformanceCounterFrequency,
+                      &StackDeallocationTimeInNS,
+                      1000 * 1000);
 
-  printf("Stack Initialization Time: %fms [%u %u]\n", StackInitializationTime.LowPart * 1000.f / PerformanceCounterFrequency.LowPart,
-         StackInitializationTime.HighPart, StackInitializationTime.LowPart);
-  printf("Stack Allocation Time: %fms [%u %u]\n", StackAllocationTime.LowPart * 1000.f / PerformanceCounterFrequency.LowPart,
-         StackAllocationTime.HighPart, StackAllocationTime.LowPart);
-  printf("Stack Deallocation Time: %fms [%u %u]\n", StackDeallocationTime.LowPart * 1000.f / PerformanceCounterFrequency.LowPart,
-         StackDeallocationTime.HighPart, StackDeallocationTime.LowPart);
-  printf("QueryPerformanceFrequency: [%u %u]\n", PerformanceCounterFrequency.HighPart, PerformanceCounterFrequency.LowPart);
+  printf("Stack Initialization Time: %llins\n",
+         StackInitializationTimeInNS.QuadPart); 
+  printf("Stack Allocation Time: %llins\n",
+         StackAllocationTimeInNS.QuadPart);
+  printf("Stack Deallocation Time: %llins\n",
+         StackDeallocationTimeInNS.QuadPart);
+  printf("QueryPerformanceFrequency: %lli\n",
+         PerformanceCounterFrequency.QuadPart);
   printf("\n\n\n");
 
   CharArraySize = 0;
   IntArraySize = 0;
   LongArraySize = 0;
 
-  list List;
-  InitializeList(&List, TestCount * (sizeof(long) + alignof(long)) * 2);
-  printf("Current Top Address: %u\n", (size_t)List.Head);
-
-  for (int TestIndex = 0; TestIndex < TestCount * 2; ++TestIndex)
-  {
-    int TestChoice = rand() % 3;
-    bool Allocate = rand() % 2 == 1;
-
-    switch (TestChoice)
-    {
-      case 0:
-      {
-        if (Allocate || CharArraySize == 0)
-        {
-          CharArray[CharArraySize] = (unsigned char *)AllocateSpaceOnList(&List, char);
-          if (CharArray[IntArraySize] == NULL) {
-            printf("Memory Full!\t");
-            break;
-          }
-          *CharArray[CharArraySize] = (unsigned char)(CharArraySize);
-          printf("-Allocated(char)\tA:%u\t", (size_t)CharArray[CharArraySize]);
-          printf("Size Allocated : %u\t", GetSizeOfAllocation(CharArray[CharArraySize]));
-          printf("Padding : %u\t", GetPaddingOfAllocation(CharArray[CharArraySize]));
-          ++CharArraySize;
-        }
-        else
-        {
-          DeallocateSpaceOnList(&List, CharArray[CharArraySize - 1]);
-          printf("-Deallocated(char): %u\t", *CharArray[CharArraySize - 1]);
-          --CharArraySize;
-        }
-      } break;
-      case 1:
-      {        
-        if (Allocate || IntArraySize == 0)
-        {
-          IntArray[IntArraySize] = (unsigned int *)AllocateSpaceOnList(&List, int);
-          if (IntArray[IntArraySize] == NULL) {
-            printf("Memory Full!");
-            break;
-          }
-          *IntArray[IntArraySize] = (unsigned int)(IntArraySize);
-          printf("-Allocated(int) \tA:%u\t", (size_t)IntArray[IntArraySize]);
-          printf("Size Allocated : %u\t", GetSizeOfAllocation(IntArray[IntArraySize]));
-          printf("Padding : %u\t", GetPaddingOfAllocation(IntArray[IntArraySize]));
-          ++IntArraySize;
-        }
-        else
-        {
-          DeallocateSpaceOnList(&List, IntArray[IntArraySize - 1]);
-          printf("-Deallocated(int): %u\t", *IntArray[IntArraySize - 1]);
-          --IntArraySize;
-        }
-      } break;
-      case 2:
-      {
-        if (LongArray[LongArraySize] == NULL) {
-          printf("Memory Full!\t");
-          break;
-        }
-
-        if (Allocate || LongArraySize == 0)
-        {
-          LongArray[LongArraySize] = (unsigned long *)AllocateSpaceOnList(&List, long);
-          *LongArray[LongArraySize] = (unsigned long)(LongArraySize);
-          printf("-Allocated(long)\tA:%u\t", (size_t)LongArray[LongArraySize]);
-          printf("Size Allocated : %u\t", GetSizeOfAllocation(LongArray[LongArraySize]));
-          printf("Padding : %u\t", GetPaddingOfAllocation(LongArray[LongArraySize]));
-          ++LongArraySize;
-        }
-        else
-        {
-          DeallocateSpaceOnList(&List, LongArray[LongArraySize - 1]);
-          printf("-Deallocated(long): %u\t", *LongArray[LongArraySize - 1]);
-          --LongArraySize;
-        }
-      } break;
-    }
-    printf("Space Remaining : %d\n", List.SpaceRemaining);
-  }
-
-  printf("\nSpace Remaining : %d\n", List.SpaceRemaining);
-
-  while (CharArraySize > 0)
-  {
-    DeallocateSpaceOnList(&List, CharArray[CharArraySize - 1]);
-    printf("-Deallocated(char): %u\t", *CharArray[CharArraySize - 1]);
-    printf("Space Remaining : %d\n", List.SpaceRemaining);
-    --CharArraySize;
-  }
-
-  while (IntArraySize > 0)
-  {
-    DeallocateSpaceOnList(&List, IntArray[IntArraySize - 1]);
-    printf("-Deallocated(int): %u\t", *IntArray[IntArraySize - 1]);
-    printf("Space Remaining : %d\n", List.SpaceRemaining);
-    --IntArraySize;
-  }
-
-  while (LongArraySize > 0)
-  {
-    DeallocateSpaceOnList(&List, LongArray[LongArraySize - 1]);
-    printf("-Deallocated(long): %u\t", *LongArray[LongArraySize - 1]);
-    printf("Space Remaining : %d\n", List.SpaceRemaining);
-    --LongArraySize;
-  }
+///  list List;
+///  InitializeList(&List, TestCount * (sizeof(long) + alignof(long)) * 2);
+///  printf("Current Top Address: %u\n", (size_t)List.Head);
+///
+///  for (int TestIndex = 0; TestIndex < TestCount * 2; ++TestIndex)
+///  {
+///    int TestChoice = rand() % 3;
+///    bool Allocate = rand() % 2 == 1;
+///
+///    switch (TestChoice)
+///    {
+///      case 0:
+///      {
+///        if (Allocate || CharArraySize == 0)
+///        {
+///          CharArray[CharArraySize] = (unsigned char *)AllocateSpaceOnList(&List, char);
+///          if (CharArray[IntArraySize] == NULL) {
+///            printf("Memory Full!\t");
+///            break;
+///          }
+///          *CharArray[CharArraySize] = (unsigned char)(CharArraySize);
+///          printf("-Allocated(char)\tA:%u\t", (size_t)CharArray[CharArraySize]);
+///          printf("Size Allocated : %u\t", GetSizeOfAllocation(CharArray[CharArraySize]));
+///          printf("Padding : %u\t", GetPaddingOfAllocation(CharArray[CharArraySize]));
+///          ++CharArraySize;
+///        }
+///        else
+///        {
+///          DeallocateSpaceOnList(&List, CharArray[CharArraySize - 1]);
+///          printf("-Deallocated(char): %u\t", *CharArray[CharArraySize - 1]);
+///          --CharArraySize;
+///        }
+///      } break;
+///      case 1:
+///      {        
+///        if (Allocate || IntArraySize == 0)
+///        {
+///          IntArray[IntArraySize] = (unsigned int *)AllocateSpaceOnList(&List, int);
+///          if (IntArray[IntArraySize] == NULL) {
+///            printf("Memory Full!");
+///            break;
+///          }
+///          *IntArray[IntArraySize] = (unsigned int)(IntArraySize);
+///          printf("-Allocated(int) \tA:%u\t", (size_t)IntArray[IntArraySize]);
+///          printf("Size Allocated : %u\t", GetSizeOfAllocation(IntArray[IntArraySize]));
+///          printf("Padding : %u\t", GetPaddingOfAllocation(IntArray[IntArraySize]));
+///          ++IntArraySize;
+///        }
+///        else
+///        {
+///          DeallocateSpaceOnList(&List, IntArray[IntArraySize - 1]);
+///          printf("-Deallocated(int): %u\t", *IntArray[IntArraySize - 1]);
+///          --IntArraySize;
+///        }
+///      } break;
+///      case 2:
+///      {
+///        if (LongArray[LongArraySize] == NULL) {
+///          printf("Memory Full!\t");
+///          break;
+///        }
+///
+///        if (Allocate || LongArraySize == 0)
+///        {
+///          LongArray[LongArraySize] = (unsigned long *)AllocateSpaceOnList(&List, long);
+///          *LongArray[LongArraySize] = (unsigned long)(LongArraySize);
+///          printf("-Allocated(long)\tA:%u\t", (size_t)LongArray[LongArraySize]);
+///          printf("Size Allocated : %u\t", GetSizeOfAllocation(LongArray[LongArraySize]));
+///          printf("Padding : %u\t", GetPaddingOfAllocation(LongArray[LongArraySize]));
+///          ++LongArraySize;
+///        }
+///        else
+///        {
+///          DeallocateSpaceOnList(&List, LongArray[LongArraySize - 1]);
+///          printf("-Deallocated(long): %u\t", *LongArray[LongArraySize - 1]);
+///          --LongArraySize;
+///        }
+///      } break;
+///    }
+///    printf("Space Remaining : %d\n", List.SpaceRemaining);
+///  }
+///
+///  printf("\nSpace Remaining : %d\n", List.SpaceRemaining);
+///
+///  while (CharArraySize > 0)
+///  {
+///    DeallocateSpaceOnList(&List, CharArray[CharArraySize - 1]);
+///    printf("-Deallocated(char): %u\t", *CharArray[CharArraySize - 1]);
+///    printf("Space Remaining : %d\n", List.SpaceRemaining);
+///    --CharArraySize;
+///  }
+///
+///  while (IntArraySize > 0)
+///  {
+///    DeallocateSpaceOnList(&List, IntArray[IntArraySize - 1]);
+///    printf("-Deallocated(int): %u\t", *IntArray[IntArraySize - 1]);
+///    printf("Space Remaining : %d\n", List.SpaceRemaining);
+///    --IntArraySize;
+///  }
+///
+///  while (LongArraySize > 0)
+///  {
+///    DeallocateSpaceOnList(&List, LongArray[LongArraySize - 1]);
+///    printf("-Deallocated(long): %u\t", *LongArray[LongArraySize - 1]);
+///    printf("Space Remaining : %d\n", List.SpaceRemaining);
+///    --LongArraySize;
+///  }
 
   return 0;
 }

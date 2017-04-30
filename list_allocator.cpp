@@ -2,24 +2,24 @@ struct free_list_chunk;
 struct list
 {
   memory Memory;
-  unsigned int SpaceRemaining;
+  size_t SpaceRemaining;
   free_list_chunk *Head;
 };
 
 struct free_list_chunk
 {
   free_list_chunk *Next;
-  unsigned int Size;
+  size_t Size;
   signed char Padding;
 };
 
 struct allocated_list_chunk
 {
-  unsigned int Size;
+  size_t Size;
   signed char Padding;
 };
 
-internal void
+void
 InitializeList(list *List, size_t Size)
 {
   List->Memory.AllocatedSpace = malloc(Size);
@@ -31,7 +31,7 @@ InitializeList(list *List, size_t Size)
   List->Head->Padding = 0;
 }
 
-internal size_t
+size_t
 AlignAddress(size_t Address, unsigned char Alignment)
 {
   assert(Alignment > 0);
@@ -64,8 +64,8 @@ FindAndResizeFittingChunkFromList(list *List, unsigned int Size, unsigned char A
   size_t HeaderAddress = AlignedFittingChunkAddress - sizeof(allocated_list_chunk);
   size_t AlignedHeaderAddress = AlignAddress(HeaderAddress, alignof(allocated_list_chunk));
 
-  unsigned int AllocationSize = Size + (FittingChunkAddress - AlignedFittingChunkAddress);
-  unsigned char AllocationPadding = (unsigned char)(AlignedFittingChunkAddress - AlignedHeaderAddress);
+  size_t AllocationSize = Size + (FittingChunkAddress - AlignedFittingChunkAddress);
+  char AllocationPadding = (char)(AlignedFittingChunkAddress - AlignedHeaderAddress);
 
   size_t TotalSize = AllocationSize + AllocationPadding;
 
@@ -104,7 +104,7 @@ FindAndResizeFittingChunkFromList(list *List, unsigned int Size, unsigned char A
   return (void *)(AlignedFittingChunkAddress);
 }
 
-internal unsigned int
+size_t
 GetSizeOfAllocation(void* Address)
 {
   size_t AllocationAddress = AlignAddress((size_t)Address - sizeof(allocated_list_chunk), alignof(allocated_list_chunk));
@@ -113,7 +113,7 @@ GetSizeOfAllocation(void* Address)
   return Allocation->Size;
 }
 
-internal unsigned char
+char
 GetPaddingOfAllocation(void* Address)
 {
   size_t AllocationAddress = AlignAddress((size_t)Address - sizeof(allocated_list_chunk), alignof(allocated_list_chunk));
@@ -124,14 +124,14 @@ GetPaddingOfAllocation(void* Address)
 
 // Todo(sigmasleep): Add alignment
 #define AllocateSpaceOnList(Stack, Type) AllocateSpaceOnList_(Stack, sizeof(Type), alignof(Type))
-internal void*
+void*
 AllocateSpaceOnList_(list *List, unsigned int Size, unsigned char Alignment)
 {
   return FindAndResizeFittingChunkFromList(List, Size, Alignment);
 }
 
 //#define DeallocateSpaceOnList(List, TypedPointer) DeallocateSpaceOnList_(List, (void *)TypedPointer))
-internal void
+void
 DeallocateSpaceOnList(list *List, void* Address)
 {
   size_t AllocationAddress = AlignAddress((size_t)Address - sizeof(allocated_list_chunk), alignof(allocated_list_chunk));
@@ -171,7 +171,7 @@ DeallocateSpaceOnList(list *List, void* Address)
     
     free_list_chunk *NewChunk = (free_list_chunk *)((size_t)AlignedNewFreeChunkAddress);
 
-    unsigned int AllocationTotalSize = Allocation->Size + Allocation->Padding;
+    size_t AllocationTotalSize = Allocation->Size + Allocation->Padding;
 
     NewChunk->Padding = (signed char)(NewFreeChunkAddress - AlignedNewFreeChunkAddress);
     NewChunk->Size = AllocationTotalSize - NewChunk->Padding;
@@ -182,8 +182,8 @@ DeallocateSpaceOnList(list *List, void* Address)
   }
   else
   {
-    unsigned int NewFreeChunkSize = Allocation->Size + Allocation->Padding;
-    signed char NewFreeChunkPadding = 0;
+    size_t NewFreeChunkSize = Allocation->Size + Allocation->Padding;
+    char NewFreeChunkPadding = 0;
     
     if (AllocationIsAdjacentToNextChunk)
     {
