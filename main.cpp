@@ -86,7 +86,6 @@ DivideLargeIntegers(
 }
 
 #define TestCount 300
-
 internal bool
 ListTest()
 {
@@ -240,8 +239,8 @@ ListTest()
 	return WhatTheDuck;
 }
 
-int
-main()
+internal void
+RunTests()
 {
   LARGE_INTEGER PerformanceCounterFrequency;
   LARGE_INTEGER OldTime;
@@ -259,11 +258,128 @@ main()
   LARGE_INTEGER StackInitializationTime;
   SubtractLargeIntegers(&NewTime, &OldTime, &StackInitializationTime);
 
-  unsigned char *CharArray[TestCount];
+  char *CharArray[TestCount];
   int CharArraySize = 0;
-  unsigned int *IntArray[TestCount];
+  
+  int *IntArray[TestCount];
   int IntArraySize = 0;
-  unsigned long *LongArray[TestCount];
+
+  long *LongArray[TestCount];
+  int LongArraySize = 0;
+
+  int TestChoiceOrder[TestCount];
+
+  QueryPerformanceCounter(&OldTime);
+
+  for(int TestIndex = 0; TestIndex < TestCount; ++TestIndex)
+  {
+    int TestChoice = rand() % 3;
+    TestChoiceOrder[TestIndex] = TestChoice;
+    switch(TestChoice)
+    {
+      case 0:
+      {
+        CharArray[CharArraySize] = (char *)AllocateSpaceOnStack(&Stack, char);
+        *CharArray[CharArraySize] = (char)(CharArraySize);
+        ++CharArraySize;
+      } break;
+      case 1:
+      {
+        IntArray[IntArraySize] = (int *)AllocateSpaceOnStack(&Stack, int);
+        *IntArray[IntArraySize] = (int)(IntArraySize);
+        ++IntArraySize;
+      } break;
+      case 2:
+      {
+        LongArray[LongArraySize] = (long *)AllocateSpaceOnStack(&Stack, long);
+        *LongArray[LongArraySize] = (long)(LongArraySize);
+        ++LongArraySize;
+      } break;
+    }
+  }
+
+  QueryPerformanceCounter(&NewTime);
+  LARGE_INTEGER StackAllocationTime;
+  SubtractLargeIntegers(&NewTime, &OldTime, &StackAllocationTime);
+
+  QueryPerformanceCounter(&OldTime);
+
+  for(int TestIndex = TestCount - 1; TestIndex >= 0; --TestIndex)
+  {
+    switch(TestChoiceOrder[TestIndex])
+    {
+      case 0:
+      {
+        DeallocateSpaceOnStack(&Stack, char);
+      } break;
+      case 1:
+      {
+        DeallocateSpaceOnStack(&Stack, int);
+      } break;
+      case 2:
+      {
+        DeallocateSpaceOnStack(&Stack, long);
+      } break;
+    }
+  }  
+
+  QueryPerformanceCounter(&NewTime);
+  LARGE_INTEGER StackDeallocationTime;
+  SubtractLargeIntegers(&NewTime, &OldTime, &StackDeallocationTime);
+
+  LARGE_INTEGER StackInitializationTimeInNS;
+  DivideLargeIntegers(&StackInitializationTime, &PerformanceCounterFrequency,
+                      &StackInitializationTimeInNS,
+                      1000 * 1000);
+  LARGE_INTEGER StackAllocationTimeInNS;
+  DivideLargeIntegers(&StackAllocationTime, &PerformanceCounterFrequency,
+                      &StackAllocationTimeInNS,
+                      1000 * 1000);
+  LARGE_INTEGER StackDeallocationTimeInNS;
+  DivideLargeIntegers(&StackDeallocationTime, &PerformanceCounterFrequency,
+                      &StackDeallocationTimeInNS,
+                      1000 * 1000);
+
+  printf("Stack Initialization Time: %llins\n",
+         StackInitializationTimeInNS.QuadPart); 
+  printf("Stack Allocation Time: %llins\n",
+         StackAllocationTimeInNS.QuadPart);
+  printf("Stack Deallocation Time: %llins\n",
+         StackDeallocationTimeInNS.QuadPart);
+  printf("\n");
+
+  ListTest();
+}
+
+// Note: I can't think of a better way to guarantee performance of the
+// non-verbose mode without creating another method.
+internal void
+RunTestsVerbose()
+{
+  LARGE_INTEGER PerformanceCounterFrequency;
+  LARGE_INTEGER OldTime;
+  LARGE_INTEGER NewTime;
+
+  QueryPerformanceFrequency(&PerformanceCounterFrequency);
+
+  srand((unsigned int)time(NULL));
+#define TestCount 200
+  stack Stack;
+
+  QueryPerformanceCounter(&OldTime);
+  InitializeStack(&Stack, TestCount * (sizeof(long)+alignof(long)));
+  QueryPerformanceCounter(&NewTime);
+
+  LARGE_INTEGER StackInitializationTime;
+  SubtractLargeIntegers(&NewTime, &OldTime, &StackInitializationTime);
+
+  char *CharArray[TestCount];
+  int CharArraySize = 0;
+  
+  int *IntArray[TestCount];
+  int IntArraySize = 0;
+
+  long *LongArray[TestCount];
   int LongArraySize = 0;
 
   int TestChoiceOrder[TestCount];
@@ -282,22 +398,22 @@ main()
     {
       case 0:
       {
-        CharArray[CharArraySize] = (unsigned char *)AllocateSpaceOnStack(&Stack, char);
-        *CharArray[CharArraySize] = (unsigned char)(CharArraySize);
+        CharArray[CharArraySize] = (char *)AllocateSpaceOnStack(&Stack, char);
+        *CharArray[CharArraySize] = (char)(CharArraySize);
         ++CharArraySize;
         printf("-Allocated(char) \t");
       } break;
       case 1:
       {
-        IntArray[IntArraySize] = (unsigned int *)AllocateSpaceOnStack(&Stack, int);
-        *IntArray[IntArraySize] = (unsigned int)(IntArraySize);
+        IntArray[IntArraySize] = (int *)AllocateSpaceOnStack(&Stack, int);
+        *IntArray[IntArraySize] = (int)(IntArraySize);
         ++IntArraySize;
         printf("-Allocated(int) \t");
       } break;
       case 2:
       {
-        LongArray[LongArraySize] = (unsigned long *)AllocateSpaceOnStack(&Stack, long);
-        *LongArray[LongArraySize] = (unsigned long)(LongArraySize);
+        LongArray[LongArraySize] = (long *)AllocateSpaceOnStack(&Stack, long);
+        *LongArray[LongArraySize] = (long)(LongArraySize);
         ++LongArraySize;
         printf("-Allocated(long) \t");
       } break;
@@ -406,9 +522,40 @@ main()
          StackDeallocationTimeInNS.QuadPart);
   printf("QueryPerformanceFrequency: %lli\n",
          PerformanceCounterFrequency.QuadPart);
-  printf("\n\n\n");
+  printf("\n");
 
 	ListTest();
+}
+
+int
+main(int argv, char** argc)
+{
+  switch(argv)
+  {
+    case 1:
+    {
+      RunTests();
+    } break;
+    case 2:
+    {
+      if (strcmp("-verbose", argc[1]) == 0 ||
+          strcmp("-v", argc[1]) == 0)
+      {
+        RunTestsVerbose();
+        break;
+      }
+    } // Note: Intentional pass
+    default: 
+    {
+      printf("Error: unknown option %s\n", argc[1]);
+      printf("Usage: main [option]\n"
+             "\n"
+             "The available options are as follows:\n"
+             "\n"
+             "\t-v , -verbose\tPrint memory allocation information.\n"
+             "\n");
+    }
+  }
 
   return 0;
 }
