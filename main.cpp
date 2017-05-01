@@ -11,7 +11,7 @@
 
 struct memory
 {
-  size_t Size;
+  unsigned int Size;
   void *AllocatedSpace;
 };
 

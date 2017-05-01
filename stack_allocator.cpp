@@ -2,7 +2,7 @@ struct stack
 {
   memory Memory;
   void* TopOfMemory;
-  size_t SpaceRemaining;
+  unsigned int SpaceRemaining;
   bool LastAlignmentIsHeader;
 };
 
@@ -15,7 +15,7 @@ struct alignment
 };
 
 internal void
-InitializeStack(stack *Stack, size_t Size)
+InitializeStack(stack *Stack, unsigned int Size)
 {
   Stack->Memory.Size = Size;
   Stack->Memory.AllocatedSpace = malloc(Size);
@@ -26,7 +26,9 @@ InitializeStack(stack *Stack, size_t Size)
 internal inline void
 _ComputeStackRemainingSpace(stack *Stack)
 {
-  Stack->SpaceRemaining = (size_t)Stack->Memory.AllocatedSpace + Stack->Memory.Size - (size_t)Stack->TopOfMemory;
+  Stack->SpaceRemaining =
+    (unsigned int)((size_t)Stack->Memory.AllocatedSpace + Stack->Memory.Size
+                   - (size_t)Stack->TopOfMemory);
 }
 
 #define AllocateSpaceOnStack(Stack, Type) AllocateSpaceOnStack_(Stack, sizeof(Type), alignof(Type))
