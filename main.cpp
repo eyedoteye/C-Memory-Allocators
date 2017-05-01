@@ -27,7 +27,7 @@ PrintAllocationInfo(void *Address)
 	allocated_list_header_properties AllocatedHeaderProperties;
 	GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties, (size_t)Address);
   
-	printf("AllocatedHeader Address:%u\t", AllocatedHeaderProperties.Address);
+	printf("AllocatedHeader Address:%zu\t", AllocatedHeaderProperties.Address);
   printf("ChunkSize Allocated: %u\t", AllocatedHeaderProperties.ChunkSize);
 	printf("PrePadding: %u\t", AllocatedHeaderProperties.PrePadding);
 	printf("PostPadding: %u\n", AllocatedHeaderProperties.PostPadding);
@@ -59,7 +59,7 @@ PrintList(list *List)
 
   while(FreeHeader != NULL)
   {
-    printf("FreeHeader Address:%u\t", (size_t)FreeHeader);
+    printf("FreeHeader Address:%zu\t", (size_t)FreeHeader);
     printf("ChunkSize: %u\t", FreeHeader->ChunkSize);
     printf("Offset : %u\n", FreeHeader->Offset);
     FreeHeader = FreeHeader->Next;
@@ -99,8 +99,8 @@ ListTest()
 	list List;
 	InitializeList(&List, TestCount * (sizeof(long) + alignof(long)) * 2);
 	printf("Total Space Allocated: %u\n", List.Memory.Size);
-	printf("List Address Start: %u\n", (size_t)List.Memory.AllocatedSpace);
-	printf("List Address End: %u\n", (size_t)List.Memory.AllocatedSpace + List.Memory.Size);
+	printf("List Address Start: %zu\n", (size_t)List.Memory.AllocatedSpace);
+	printf("List Address End: %zu\n", (size_t)List.Memory.AllocatedSpace + List.Memory.Size);
 
 	for(int TestIndex = 0; TestIndex < TestCount * 2; ++TestIndex)
 	{
@@ -125,7 +125,7 @@ ListTest()
 				else
 				{
 					--CharArraySize;
-					printf("Char Deallocated: %u\tAddress: %u\n", *CharArray[CharArraySize], (size_t)CharArray[CharArraySize]);
+					printf("Char Deallocated: %u\tAddress: %zu\n", *CharArray[CharArraySize], (size_t)CharArray[CharArraySize]);
 					DeallocateSpaceOnList(&List, CharArray[CharArraySize]);
 				}
 			} break;
@@ -145,7 +145,7 @@ ListTest()
 				else
 				{
 					--IntArraySize;
-					printf("Int Deallocated: %u\tAddress: %u\n", *IntArray[IntArraySize], (size_t)IntArray[IntArraySize]);
+					printf("Int Deallocated: %u\tAddress: %zu\n", *IntArray[IntArraySize], (size_t)IntArray[IntArraySize]);
 					DeallocateSpaceOnList(&List, IntArray[IntArraySize]);
 				}
 			} break;
@@ -165,7 +165,7 @@ ListTest()
 				else
 				{
 					--LongArraySize;
-					printf("Long Deallocated: %u\tAddress: %u\n", *LongArray[LongArraySize], (size_t)LongArray[LongArraySize]);
+					printf("Long Deallocated: %u\tAddress: %zu\n", *LongArray[LongArraySize], (size_t)LongArray[LongArraySize]);
 					DeallocateSpaceOnList(&List, LongArray[LongArraySize]);
 				}
 			} break;
@@ -183,7 +183,7 @@ ListTest()
 		for(int IntArrayIndex = 0; IntArrayIndex < IntArraySize; ++IntArrayIndex)
 		{
 			printf("I[%u]:%u\t", IntArrayIndex, *(unsigned char*)IntArray[IntArrayIndex]);
-			if(!IsAllocationValid(IntArray[IntArrayIndex], *IntArray[IntArrayIndex])) {
+			if(!IsAllocationValid(IntArray[IntArrayIndex], (unsigned char)*IntArray[IntArrayIndex])) {
 				allocated_list_header_properties AllocatedHeaderProperties;
 				GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties, (size_t)IntArray[IntArrayIndex]);
 				printf("BORKED\n");
@@ -192,7 +192,7 @@ ListTest()
 		for(int LongArrayIndex = 0; LongArrayIndex < LongArraySize; ++LongArrayIndex)
 		{
 			printf("L[%u]:%u\t", LongArrayIndex, *(unsigned char*)LongArray[LongArrayIndex]);
-			if(!IsAllocationValid(LongArray[LongArrayIndex],*LongArray[LongArrayIndex])) {
+			if(!IsAllocationValid(LongArray[LongArrayIndex], (unsigned char)*LongArray[LongArrayIndex])) {
 				allocated_list_header_properties AllocatedHeaderProperties;
 				GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties, (size_t)LongArray[LongArrayIndex]);
 				printf("BORKED\n");
@@ -363,7 +363,6 @@ RunTestsVerbose()
   QueryPerformanceFrequency(&PerformanceCounterFrequency);
 
   srand((unsigned int)time(NULL));
-#define TestCount 200
   stack Stack;
 
   QueryPerformanceCounter(&OldTime);
@@ -386,7 +385,7 @@ RunTestsVerbose()
 
   printf("Stack Allocation Starting\n");
   printf("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-  printf("Space Remaining : %zu\n", Stack.SpaceRemaining);
+  printf("Space Remaining : %u\n", Stack.SpaceRemaining);
 
   QueryPerformanceCounter(&OldTime);
 
@@ -419,7 +418,7 @@ RunTestsVerbose()
       } break;
     }
     printf("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-    printf("Space Remaining : %zu\t", Stack.SpaceRemaining);
+    printf("Space Remaining : %u\t", Stack.SpaceRemaining);
     if(Stack.LastAlignmentIsHeader)
     {
       printf("Last Alignment Is Header\n");
@@ -453,7 +452,7 @@ RunTestsVerbose()
   printf("\n\n");
   printf("Stack Deallocation Starting\n");
   printf("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-  printf("Space Remaining : %zu\t", Stack.SpaceRemaining);
+  printf("Space Remaining : %u\t", Stack.SpaceRemaining);
   if(Stack.LastAlignmentIsHeader)
   {
     printf("Last Alignment Is Header\n");
@@ -486,7 +485,7 @@ RunTestsVerbose()
       } break;
     }
     printf("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-    printf("Space Remaining : %zu\t", Stack.SpaceRemaining);
+    printf("Space Remaining : %u\t", Stack.SpaceRemaining);
     if(Stack.LastAlignmentIsHeader)
     {
       printf("Last Alignment Is Header\n");
