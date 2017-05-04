@@ -190,8 +190,6 @@ FindAndResizeFittingChunkFromList(list *List, size_t RequestedSize, unsigned cha
   allocated_list_header_post_padding *AllocatedHeaderPostPadding = (allocated_list_header_post_padding *)
 	  (AllocatedChunkAddress - sizeof(allocated_list_header_post_padding));
   *AllocatedHeaderPostPadding = PotentialAllocatedHeaderProperties.PostPadding;
-
-  // printf("Required Size: %u\t%u\n", RequiredSize, LeftoverSize);
   
   // Note: Places size of allocation leftover into chunk for debugging purposes.
   switch(Type)
@@ -226,16 +224,22 @@ internal size_t
 GetAllocatedHeaderAddress(size_t ChunkAddress)
 {
   allocated_list_header_post_padding AllocatedHeaderPostPadding =
-    (allocated_list_header_post_padding)(ChunkAddress - sizeof(allocated_list_header_post_padding));
-  return ChunkAddress - AllocatedHeaderPostPadding - sizeof(allocated_list_header);
+    (allocated_list_header_post_padding)ChunkAddress -
+    sizeof(allocated_list_header_post_padding);
+
+  return ChunkAddress - AllocatedHeaderPostPadding
+    - sizeof(allocated_list_header);
 }
 #pragma warning(pop)
 
 internal void
-GetAllocatedHeaderFromAllocatedChunk(allocated_list_header_properties *AllocatedHeaderProperties, size_t ChunkAddress)
+GetAllocatedHeaderFromAllocatedChunk(
+  allocated_list_header_properties *AllocatedHeaderProperties,
+  size_t ChunkAddress)
 {
 	allocated_list_header_post_padding *AllocatedHeaderPostPadding =
-		(allocated_list_header_post_padding *)((size_t)ChunkAddress - sizeof(allocated_list_header_post_padding));
+		(allocated_list_header_post_padding *)
+    ((size_t)ChunkAddress - sizeof(allocated_list_header_post_padding));
 
 	allocated_list_header *AllocatedHeader =
 		(allocated_list_header *)((size_t)ChunkAddress
@@ -252,47 +256,52 @@ GetAllocatedHeaderFromAllocatedChunk(allocated_list_header_properties *Allocated
 internal void
 DeallocateSpaceOnList(list *List, void* Address)
 {
-  //allocated_list_header_post_padding *AllocatedHeaderPostPadding = 
-  //  (allocated_list_header_post_padding *)((size_t)Address - sizeof(allocated_list_header_post_padding));
-
-  //allocated_list_header *AllocatedHeader =
-  //  (allocated_list_header *)((size_t)Address - *AllocatedHeaderPostPadding - sizeof(allocated_list_header));
-
 	allocated_list_header_properties AllocatedHeaderProperties;
-	GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties, (size_t)Address);
+	GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties,
+                                       (size_t)Address);
 
   free_list_header *PreviousFreeHeader = NULL;
   free_list_header *FreeHeader = List->Head;
 
-  while (FreeHeader != NULL &&
-		(size_t)FreeHeader - FreeHeader->Offset < (AllocatedHeaderProperties.Address - AllocatedHeaderProperties.PrePadding))
+  while(FreeHeader != NULL
+        && (size_t)FreeHeader - FreeHeader->Offset
+        < AllocatedHeaderProperties.Address
+        - AllocatedHeaderProperties.PrePadding)
   {
     PreviousFreeHeader = FreeHeader;
     FreeHeader = FreeHeader->Next;
   }
 
-  // Note(sigmasleep): Order of structs: PreviousFreeHeader | AllocatedHeader | FreeHeader
+  // Note: Order of structs: PreviousFreeHeader | AllocatedHeader | FreeHeader
  
-  bool AllocationIsAdjacentToNextFreeHeader = FreeHeader != NULL && 
-		AllocatedHeaderProperties.Address + sizeof(allocated_list_header)
+  bool AllocationIsAdjacentToNextFreeHeader = FreeHeader != NULL
+    && AllocatedHeaderProperties.Address + sizeof(allocated_list_header)
 		+ AllocatedHeaderProperties.PostPadding + AllocatedHeaderProperties.ChunkSize
 		== (size_t)FreeHeader - FreeHeader->Offset;
-  bool AllocationIsAdjacentToPriorFreeHeader = PreviousFreeHeader != NULL &&
-    (size_t)PreviousFreeHeader - PreviousFreeHeader->Offset + PreviousFreeHeader->ChunkSize
-		== (size_t)AllocatedHeaderProperties.Address - AllocatedHeaderProperties.PrePadding;
+  bool AllocationIsAdjacentToPriorFreeHeader = PreviousFreeHeader != NULL
+    && (size_t)PreviousFreeHeader - PreviousFreeHeader->Offset
+       + PreviousFreeHeader->ChunkSize
+    == (size_t)AllocatedHeaderProperties.Address
+       - AllocatedHeaderProperties.PrePadding; 
 
-  size_t NewFreeHeaderChunkSize = AllocatedHeaderProperties.PrePadding + sizeof(allocated_list_header)
+  size_t NewFreeHeaderChunkSize =
+    AllocatedHeaderProperties.PrePadding + sizeof(allocated_list_header)
     + AllocatedHeaderProperties.PostPadding + AllocatedHeaderProperties.ChunkSize;
-  size_t NewFreeHeaderChunkAddress = AllocatedHeaderProperties.Address - AllocatedHeaderProperties.PrePadding;
-  size_t NewFreeHeaderAddress = AlignAddress(NewFreeHeaderChunkAddress + alignof(free_list_header)-1,
+  size_t NewFreeHeaderChunkAddress =
+    AllocatedHeaderProperties.Address - AllocatedHeaderProperties.PrePadding;
+  size_t NewFreeHeaderAddress =
+    AlignAddress(NewFreeHeaderChunkAddress + alignof(free_list_header)-1,
                                              alignof(free_list_header));
-  unsigned char NewFreeHeaderOffset = (unsigned char)(NewFreeHeaderAddress - NewFreeHeaderChunkAddress);
+  unsigned char NewFreeHeaderOffset =
+    (unsigned char)(NewFreeHeaderAddress - NewFreeHeaderChunkAddress);
 
 	size_t AddedSpace = NewFreeHeaderChunkSize;
 
-  if (!AllocationIsAdjacentToNextFreeHeader && !AllocationIsAdjacentToPriorFreeHeader)
+  if(!AllocationIsAdjacentToNextFreeHeader
+     && !AllocationIsAdjacentToPriorFreeHeader)
   {
-    free_list_header *NewFreeListHeader = (free_list_header *)(NewFreeHeaderAddress);
+    free_list_header *NewFreeListHeader =
+      (free_list_header *)(NewFreeHeaderAddress);
     
     NewFreeListHeader->ChunkSize = NewFreeHeaderChunkSize;
     NewFreeListHeader->Offset = NewFreeHeaderOffset;
@@ -304,8 +313,8 @@ DeallocateSpaceOnList(list *List, void* Address)
 
 			if(FreeHeader == NULL)
 			{
-				// Note(sigmasleep): Remaining space was too small for allocation and free list was emptied.
-				// That leftover space needs to be accounted for.
+				// Note: Remaining space was too small for allocation and free list was
+        // emptied. That leftover space needs to be accounted for.
 				NewFreeListHeader->ChunkSize += List->SpaceRemaining;
 			}
     }
@@ -316,7 +325,7 @@ DeallocateSpaceOnList(list *List, void* Address)
   }
   else
   {    
-    if (AllocationIsAdjacentToNextFreeHeader)
+    if(AllocationIsAdjacentToNextFreeHeader)
     {
 			if(PreviousFreeHeader == NULL)
 			{
@@ -328,45 +337,23 @@ DeallocateSpaceOnList(list *List, void* Address)
 			else
 			{
 				PreviousFreeHeader->Next = (free_list_header *)NewFreeHeaderAddress;
-				PreviousFreeHeader->Next->ChunkSize = NewFreeHeaderChunkSize + FreeHeader->ChunkSize;
+				PreviousFreeHeader->Next->ChunkSize =
+          NewFreeHeaderChunkSize + FreeHeader->ChunkSize;
 				PreviousFreeHeader->Next->Offset = NewFreeHeaderOffset;
 				PreviousFreeHeader->Next->Next = FreeHeader->Next;
 			}
       
-      // Note(sigmasleep): Sets up values for: if (AllocationIsAdjacentToPriorChunk)
+      // Note: Sets up values for: if (AllocationIsAdjacentToPriorChunk)
 			NewFreeHeaderChunkSize += FreeHeader->ChunkSize;
 			FreeHeader = FreeHeader->Next;
     }
-    if (AllocationIsAdjacentToPriorFreeHeader)
+    if(AllocationIsAdjacentToPriorFreeHeader)
     {
 			PreviousFreeHeader->ChunkSize += NewFreeHeaderChunkSize;
-			// Note(sigmasleep): The following line is for merging with an allocated header
-			// that has already been merged with an adjacent-next FreeHeader.
+			// Note: The following line is for merging with an allocated header that
+      // has already been merged with an adjacent-next FreeHeader.
 			PreviousFreeHeader->Next = FreeHeader;
     }
   }
 	List->SpaceRemaining += AddedSpace;
-
-	free_list_header *ListIterator = List->Head;
-	size_t Size = 0;
-	size_t ListLength = 0;
-  printf("FreeList Status:\n  ");
-	while(ListIterator != NULL)
-	{
-    if((size_t)ListIterator == (size_t)NewFreeHeaderAddress
-       || (AllocationIsAdjacentToPriorFreeHeader
-           && (size_t)ListIterator == (size_t)PreviousFreeHeader))
-    {
-      printf("|%zu[%zu]| ", (size_t)ListIterator, ListIterator->ChunkSize);
-    }
-    else
-    {
-      printf("%zu[%zu] ", (size_t)ListIterator, ListIterator->ChunkSize);
-    }
-
-		Size += ListIterator->ChunkSize;
-		ListIterator = ListIterator->Next;
-		++ListLength;
-	}
-  printf("=> %zu\n", Size);
 }

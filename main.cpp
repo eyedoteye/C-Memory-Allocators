@@ -21,6 +21,17 @@ struct memory
 #include <time.h>
 #include <limits.h>
 
+#ifdef VERBOSE
+  #define V_PRINTF(...) printf(...)
+#else
+  #define V_PRINTF(...)  
+#endif
+
+#ifdef VERBOSE
+  #define V_PRINT_ALLOCATION_INFO(...) PrintAllocationInfo(...)
+#else
+  #define V_PRINT_ALLOCATION_INFO(...)  
+#endif
 internal void
 PrintAllocationInfo(void *Address)
 {
@@ -33,37 +44,52 @@ PrintAllocationInfo(void *Address)
 	printf("PostPadding: %u\n", AllocatedHeaderProperties.PostPadding);
 }
 
+#ifdef VERBOSE
+  #define V_PRINT_FREE_LIST(...) PrintFreeList(...)
+#else
+  #define V_PRINT_FREE_LIST(...)
+#endif
+internal void
+PrintFreeList(list *List, size_t HighlightHeaderAddress)
+{
+  free_list_header *ListIterator = List->Head;
+
+	size_t Size = 0;
+	size_t ListLength = 0;
+
+  printf("FreeList Status:\n  ");
+	while(ListIterator != NULL)
+	{
+    if(HighlightHeaderAddress == (size_t)ListIterator)
+    {
+      printf("|%zu[%zu]| ", (size_t)ListIterator, ListIterator->ChunkSize);
+    }
+    else
+    {
+      printf("%zu[%zu] ", (size_t)ListIterator, ListIterator->ChunkSize);
+    }
+
+		Size += ListIterator->ChunkSize;
+		ListIterator = ListIterator->Next;
+		++ListLength;
+	}
+  printf("=> %zu\n", Size);
+}
+
+// only works with debug stuff 
 internal bool
 IsAllocationValid(void *Address, unsigned char Value)
 {
 	allocated_list_header_properties AllocatedHeaderProperties;
-	GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties, (size_t)Address);
+	GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties,
+                                       (size_t)Address);
 
-	return (AllocatedHeaderProperties.Type == 0 && AllocatedHeaderProperties.ChunkSize == sizeof(char) + Value)
-		|| (AllocatedHeaderProperties.Type == 1 && AllocatedHeaderProperties.ChunkSize == sizeof(int) + Value)
-		|| (AllocatedHeaderProperties.Type == 2 && AllocatedHeaderProperties.ChunkSize == sizeof(long) + Value);
-}
-//
-//internal void
-//PrintDeallocationInfo(void *Address)
-//{
-//  printf("Deallocation Address:%u\t", (size_t)Address);
-//  printf("ChunkSize Deallocated : %u\t", GetSizeOfFreeChunk(Address));
-//  printf("Offset : %u\t", GetPaddingOfFreeChunk(Address));
-//}
-
-internal void
-PrintList(list *List)
-{
-  free_list_header *FreeHeader = List->Head;
-
-  while(FreeHeader != NULL)
-  {
-    printf("FreeHeader Address:%zu\t", (size_t)FreeHeader);
-    printf("ChunkSize: %zu\t", FreeHeader->ChunkSize);
-    printf("Offset : %u\n", FreeHeader->Offset);
-    FreeHeader = FreeHeader->Next;
-  }
+	return (AllocatedHeaderProperties.Type == 0 &&
+          AllocatedHeaderProperties.ChunkSize == sizeof(char) + Value)
+		|| (AllocatedHeaderProperties.Type == 1 &&
+        AllocatedHeaderProperties.ChunkSize == sizeof(int) + Value)
+		|| (AllocatedHeaderProperties.Type == 2 &&
+        AllocatedHeaderProperties.ChunkSize == sizeof(long) + Value);
 }
 
 internal void
@@ -85,8 +111,8 @@ DivideLargeIntegers(
   Quotient->QuadPart = X->QuadPart * Scale / Y->QuadPart;
 }
 
-#define TestCount 10
-internal bool
+#define TestCount 100
+internal void
 ListTest()
 {
 	unsigned char *CharArray[TestCount];
@@ -98,14 +124,17 @@ ListTest()
 
 	list List;
 	InitializeList(&List, TestCount * (sizeof(long) + alignof(long)) * 2);
-	printf("Total Space Allocated: %zu\n", List.Memory.Size);
-	printf("List Address Start: %zu\n", (size_t)List.Memory.AllocatedSpace);
-	printf("List Address End: %zu\n", (size_t)List.Memory.AllocatedSpace + List.Memory.Size);
-
+	printf("Total Space Allocated: %zubytes\n", List.Memory.Size);
+	V_PRINTF("List Address Start: %zu\n",
+         (size_t)List.Memory.AllocatedSpace);
+	V_PRINTF("List Address End: %zu\n",
+         (size_t)List.Memory.AllocatedSpace + List.Memory.Size);
+   
 	for(int TestIndex = 0; TestIndex < TestCount * 2; ++TestIndex)
 	{
 		int TestChoice = rand() % 3;
 		bool Allocate = rand() % 2 == 1;
+    size_t HighlightAddress;
 
 		switch(TestChoice)
 		{
@@ -116,18 +145,18 @@ ListTest()
 					CharArray[CharArraySize] =
             (unsigned char *)AllocateSpaceOnList(&List, char);
 					if(CharArray[CharArraySize] == NULL) {
-						printf("Cannot Allocate Char! Memory Full!\n");
+						V_PRINTF("Cannot Allocate Char! Memory Full!\n");
 						break;
 					}
-					printf("Char Allocated: %u\tAddress: %zu\n  ",
+					V_PRINTF("Char Allocated: %u\tAddress: %zu\n  ",
                  *CharArray[CharArraySize], (size_t)CharArray[CharArraySize]);
-					PrintAllocationInfo(CharArray[CharArraySize]);
+					V_PRINT_ALLOCATION_INFO(CharArray[CharArraySize]);
 					++CharArraySize;
 				}
 				else
 				{
 					--CharArraySize;
-					printf("Char Deallocated: [%u]:%u\tAddress: %zu\n",
+					V_PRINTF("Char Deallocated: [%u]:%u\tAddress: %zu\n",
                  CharArraySize,
                  *CharArray[CharArraySize],
                  (size_t)CharArray[CharArraySize]);
@@ -141,19 +170,19 @@ ListTest()
 					IntArray[IntArraySize] =
             (unsigned int *)AllocateSpaceOnList(&List, int);
 					if(IntArray[IntArraySize] == NULL) {
-						printf("Cannot Allocate Int! Memory Full!\n");
+						V_PRINTF("Cannot Allocate Int! Memory Full!\n");
 						break;
 					}
-					printf("Int Allocated: %u\tAddress: %zu\n  ",
+					V_PRINTF("Int Allocated: %u\tAddress: %zu\n  ",
                  *IntArray[IntArraySize],
                  (size_t)IntArray[IntArraySize]);
-					PrintAllocationInfo(IntArray[IntArraySize]);
+					V_PRINT_ALLOCATION_INFO(IntArray[IntArraySize]);
 					++IntArraySize;
 				}
 				else
 				{
 					--IntArraySize;
-					printf("Int Deallocated: [%u]:%u\tAddress: %zu\n",
+					V_PRINTF("Int Deallocated: [%u]:%u\tAddress: %zu\n",
                  IntArraySize,
                  *IntArray[IntArraySize],
                  (size_t)IntArray[IntArraySize]);
@@ -167,19 +196,19 @@ ListTest()
 					LongArray[LongArraySize] =
             (unsigned long *)AllocateSpaceOnList(&List, long);
 					if(LongArray[LongArraySize] == NULL) {
-						printf("Cannot Allocate Long! Memory Full!\n");
+						V_PRINTF("Cannot Allocate Long! Memory Full!\n");
 						break;
 					}
-					printf("Long Allocated: %u\tAddress: %zu\n  ",
+					V_PRINTF("Long Allocated: %u\tAddress: %zu\n  ",
                  *LongArray[LongArraySize],
                  (size_t)LongArray[LongArraySize]);
-					PrintAllocationInfo(LongArray[LongArraySize]);
+					V_PRINT_ALLOCATION_INFO(LongArray[LongArraySize]);
 					++LongArraySize;
 				}
 				else
 				{
 					--LongArraySize;
-					printf("Long Deallocated: [%u]:%u\tAddress: %zu\n",
+					V_PRINTF("Long Deallocated: [%u]:%u\tAddress: %zu\n",
                  LongArraySize,
                  *LongArray[LongArraySize],
                  (size_t)LongArray[LongArraySize]);
@@ -187,13 +216,15 @@ ListTest()
 				}
 			} break;
 		}
-		PrintList(&List);
+
+		V_PRINT_FREE_LIST(&List, 0);
+    
 		for(int CharArrayIndex = 0; CharArrayIndex < CharArraySize; ++CharArrayIndex)
 		{
 			allocated_list_header_properties AllocatedHeaderProperties;
 			GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties,
                                            (size_t)CharArray[CharArrayIndex]);
-			printf("C[%u](%zu,%u->%zu->%u,%u):%u\t",
+			V_PRINTF("C[%u](%zu,%u->%zu->%u,%u):%u\t",
              CharArrayIndex,
              (size_t)CharArray[CharArrayIndex],
              AllocatedHeaderProperties.PrePadding,
@@ -204,16 +235,17 @@ ListTest()
 			if(!IsAllocationValid(CharArray[CharArrayIndex],
                             *CharArray[CharArrayIndex])) {
         {
-          printf("BORKED\t");
+          V_PRINTF("BORKED\t");
         }
 			}
+      V_PRINT_FREE_LIST(&List);
 		}
 		for(int IntArrayIndex = 0; IntArrayIndex < IntArraySize; ++IntArrayIndex)
 		{
 			allocated_list_header_properties AllocatedHeaderProperties;
 			GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties,
                                            (size_t)IntArray[IntArrayIndex]);
-			printf("I[%u](%zu,%u->%zu->%u,%u):%u\t",
+			V_PRINTF("I[%u](%zu,%u->%zu->%u,%u):%u\t",
              IntArrayIndex,
              (size_t)IntArray[IntArrayIndex],
              AllocatedHeaderProperties.PrePadding,
@@ -224,16 +256,17 @@ ListTest()
 			if(!IsAllocationValid(IntArray[IntArrayIndex],
                             (unsigned char)*IntArray[IntArrayIndex])) {
         {
-          printf("BORKED\t");
+          V_PRINTF("BORKED\t");
         }
 			}
+      V_PRINT_FREE_LIST(&List);
 		}
 		for(int LongArrayIndex = 0; LongArrayIndex < LongArraySize; ++LongArrayIndex)
 		{
 			allocated_list_header_properties AllocatedHeaderProperties;
 			GetAllocatedHeaderFromAllocatedChunk(&AllocatedHeaderProperties,
                                            (size_t)LongArray[LongArrayIndex]);
-			printf("L[%u](%zu,%u->%zu->%u,%u):%u\t",
+			V_PRINTF("L[%u](%zu,%u->%zu->%u,%u):%u\t",
              LongArrayIndex,
              (size_t)LongArray[LongArrayIndex],
              AllocatedHeaderProperties.PrePadding,
@@ -244,49 +277,46 @@ ListTest()
 			if(!IsAllocationValid(LongArray[LongArrayIndex],
                             (unsigned char)*LongArray[LongArrayIndex])) {
         {
-          printf("BORKED\t");
+          V_PRINTF("BORKED\t");
         }
 			}
+      V_PRINT_FREE_LIST(&List);
 		}
-		printf("Space Remaining: %zu\n", List.SpaceRemaining);
+		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
 
-	printf("\nTotal Space Reserved: %zu\n", List.Memory.Size);
-	printf("Space Remaining After Random Testing: %zu\n\n", List.SpaceRemaining);
+	V_PRINTF("\nTotal Space Reserved: %zu\n", List.Memory.Size);
+	V_PRINTF("Space Remaining After Random Testing: %zu\n\n", List.SpaceRemaining);
 
-	printf("\nChars:\n");
+	V_PRINTF("\nChars:\n");
 	for(int CharArrayIndex = 0; CharArrayIndex < CharArraySize; ++CharArrayIndex)
 	{
-		printf("[%i]:%u\tChar Deallocated\n", CharArrayIndex, *CharArray[CharArrayIndex]);
+		V_PRINTF("[%i]:%u\tChar Deallocated\n", CharArrayIndex, *CharArray[CharArrayIndex]);
 		DeallocateSpaceOnList(&List, CharArray[CharArrayIndex]);
-		PrintList(&List);
-		printf("Space Remaining: %zu\n", List.SpaceRemaining);
+		V_PRINT_FREE_LIST(&List);
+		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
-	printf("\n\nInts:\n");
+	V_PRINTF("\n\nInts:\n");
 	for(int IntArrayIndex = 0; IntArrayIndex < IntArraySize; ++IntArrayIndex)
 	{
-		printf("[%i]:%u\tInt Deallocated\n", IntArrayIndex, *IntArray[IntArrayIndex]);
+		V_PRINTF("[%i]:%u\tInt Deallocated\n", IntArrayIndex, *IntArray[IntArrayIndex]);
 		DeallocateSpaceOnList(&List, IntArray[IntArrayIndex]);
-		PrintList(&List);
-		printf("Space Remaining: %zu\n", List.SpaceRemaining);
+		V_PRINT_FREE_LIST(&List);
+		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
-	printf("\n\nLongs:\n");
+	V_PRINTF("\n\nLongs:\n");
 	for(int LongArrayIndex = 0; LongArrayIndex < LongArraySize; ++LongArrayIndex)
 	{
-		printf("[%i]:%u\tLong Deallocated\n", LongArrayIndex, *LongArray[LongArrayIndex]);
+		V_PRINTF("[%i]:%u\tLong Deallocated\n", LongArrayIndex, *LongArray[LongArrayIndex]);
 		DeallocateSpaceOnList(&List, LongArray[LongArrayIndex]);
-		PrintList(&List);
-		printf("Space Remaining: %zu\n", List.SpaceRemaining);
+		V_PRINT_FREE_LIST(&List);
+		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
 
-	printf("\nTotal Space Reserved: %zu\n", List.Memory.Size);
-	printf("Space Remaining After Full Deallocating: %zu\n\n", List.SpaceRemaining);
+	V_PRINTF("\nTotal Space Reserved: %zu\n", List.Memory.Size);
+	V_PRINTF("Space Remaining After Full Deallocating: %zu\n\n", List.SpaceRemaining);
 
-	bool WhatTheDuck = List.Memory.Size != List.SpaceRemaining || List.Head->Next != NULL;
-
-	PrintList(&List);
-
-	return WhatTheDuck;
+	V_PRINT_FREE_LIST(&List);
 }
 
 internal void
@@ -304,6 +334,12 @@ RunTests()
   QueryPerformanceCounter(&OldTime);
   InitializeStack(&Stack, TestCount * (sizeof(long)+alignof(long)));
   QueryPerformanceCounter(&NewTime);
+
+	printf("Total Space Allocated: %zubytes\n", Stack.Memory.Size);
+	V_PRINTF("List Address Start: %zu\n",
+         (size_t)Stack.Memory.AllocatedSpace);
+	V_PRINTF("Stack Address End: %zu\n",
+         (size_t)Stack.Memory.AllocatedSpace + Stack.Memory.Size);
 
   LARGE_INTEGER StackInitializationTime;
   SubtractLargeIntegers(&NewTime, &OldTime, &StackInitializationTime);
@@ -434,8 +470,8 @@ RunTestsVerbose()
   int TestChoiceOrder[TestCount];
 
   printf("Stack Allocation Starting\n");
-  printf("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-  printf("Space Remaining : %u\n", Stack.SpaceRemaining);
+  V_PRINTF("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+  V_PRINTF("Space Remaining : %u\n", Stack.SpaceRemaining);
 
   QueryPerformanceCounter(&OldTime);
 
@@ -450,32 +486,32 @@ RunTestsVerbose()
         CharArray[CharArraySize] = (char *)AllocateSpaceOnStack(&Stack, char);
         *CharArray[CharArraySize] = (char)(CharArraySize);
         ++CharArraySize;
-        printf("-Allocated(char) \t");
+        V_PRINTF("-Allocated(char) \t");
       } break;
       case 1:
       {
         IntArray[IntArraySize] = (int *)AllocateSpaceOnStack(&Stack, int);
         *IntArray[IntArraySize] = (int)(IntArraySize);
         ++IntArraySize;
-        printf("-Allocated(int) \t");
+        V_PRINTF("-Allocated(int) \t");
       } break;
       case 2:
       {
         LongArray[LongArraySize] = (long *)AllocateSpaceOnStack(&Stack, long);
         *LongArray[LongArraySize] = (long)(LongArraySize);
         ++LongArraySize;
-        printf("-Allocated(long) \t");
+        V_PRINTF("-Allocated(long) \t");
       } break;
     }
-    printf("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-    printf("Space Remaining : %u\t", Stack.SpaceRemaining);
+    V_PRINTF("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+    V_PRINTF("Space Remaining : %u\t", Stack.SpaceRemaining);
     if(Stack.LastAlignmentIsHeader)
     {
-      printf("Last Alignment Is Header\n");
+      V_PRINTF("Last Alignment Is Header\n");
     }
     else
     {
-      printf("Last Alignment Is Footer\n");
+      V_PRINTF("Last Alignment Is Footer\n");
     }
   }
 
@@ -483,33 +519,33 @@ RunTestsVerbose()
   LARGE_INTEGER StackAllocationTime;
   SubtractLargeIntegers(&NewTime, &OldTime, &StackAllocationTime);
 
-  printf("\nChars:\n");
+  V_PRINTF("\nChars:\n");
   for(int CharArrayIndex = 0; CharArrayIndex < CharArraySize; ++CharArrayIndex)
   {
-    printf("[%i]:%d\t", CharArrayIndex, *CharArray[CharArrayIndex]);
+    V_PRINTF("[%i]:%d\t", CharArrayIndex, *CharArray[CharArrayIndex]);
   }
-  printf("\n\nInts:\n");
+  V_PRINTF("\n\nInts:\n");
   for(int IntArrayIndex = 0; IntArrayIndex < IntArraySize; ++IntArrayIndex)
   {
-    printf("[%i]:%d\t", IntArrayIndex, *IntArray[IntArrayIndex]);
+    V_PRINTF("[%i]:%d\t", IntArrayIndex, *IntArray[IntArrayIndex]);
   }
-  printf("\n\nLongs:\n");
+  V_PRINTF("\n\nLongs:\n");
   for(int LongArrayIndex = 0; LongArrayIndex < LongArraySize; ++LongArrayIndex)
   {
-    printf("[%i]:%d\t", LongArrayIndex, *LongArray[LongArrayIndex]);
+    V_PRINTF("[%i]:%d\t", LongArrayIndex, *LongArray[LongArrayIndex]);
   }
 
-  printf("\n\n");
-  printf("Stack Deallocation Starting\n");
-  printf("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-  printf("Space Remaining : %u\t", Stack.SpaceRemaining);
+  V_PRINTF("\n\n");
+  V_PRINTF("Stack Deallocation Starting\n");
+  V_PRINTF("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+  V_PRINTF("Space Remaining : %u\t", Stack.SpaceRemaining);
   if(Stack.LastAlignmentIsHeader)
   {
-    printf("Last Alignment Is Header\n");
+    V_PRINTF("Last Alignment Is Header\n");
   }
   else
   {
-    printf("Last Alignment Is Footer\n");
+    V_PRINTF("Last Alignment Is Footer\n");
   }
 
   QueryPerformanceCounter(&OldTime);
@@ -521,28 +557,28 @@ RunTestsVerbose()
       case 0:
       {
         DeallocateSpaceOnStack(&Stack, char);
-        printf("-Deallocated(char)\t");
+        V_PRINTF("-Deallocated(char)\t");
       } break;
       case 1:
       {
         DeallocateSpaceOnStack(&Stack, int);
-        printf("-Deallocated(int)\t");
+        V_PRINTF("-Deallocated(int)\t");
       } break;
       case 2:
       {
         DeallocateSpaceOnStack(&Stack, long);
-        printf("-Deallocated(long)\t");
+        V_PRINTF("-Deallocated(long)\t");
       } break;
     }
-    printf("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-    printf("Space Remaining : %u\t", Stack.SpaceRemaining);
+    V_PRINTF("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+    V_PRINTF("Space Remaining : %u\t", Stack.SpaceRemaining);
     if(Stack.LastAlignmentIsHeader)
     {
-      printf("Last Alignment Is Header\n");
+      V_PRINTF("Last Alignment Is Header\n");
     }
     else
     {
-      printf("Last Alignment Is Footer\n");
+      V_PRINTF("Last Alignment Is Footer\n");
     }
   }  
 
@@ -579,32 +615,31 @@ RunTestsVerbose()
 int
 main(int argv, char** argc)
 {
-  switch(argv)
-  {
-    case 1:
-    {
+//  {
+//    case 1:
+//    {
       RunTests();
-    } break;
-    case 2:
-    {
-      if (strcmp("-verbose", argc[1]) == 0 ||
-          strcmp("-v", argc[1]) == 0)
-      {
-        RunTestsVerbose();
-        break;
-      }
-    } // Note: Intentional pass
-    default: 
-    {
-      printf("Error: unknown option %s\n", argc[1]);
-      printf("Usage: main [option]\n"
-             "\n"
-             "The available options are as follows:\n"
-             "\n"
-             "\t-v , -verbose\tPrint memory allocation information.\n"
-             "\n");
-    }
-  }
+//    } break;
+//    case 2:
+//    {
+//      if (strcmp("-verbose", argc[1]) == 0 ||
+//          strcmp("-v", argc[1]) == 0)
+//      {
+//        RunTestsVerbose();
+//        break;
+//      }
+//    } // Note: Intentional pass
+//    default: 
+//    {
+//      printf("Error: unknown option %s\n", argc[1]);
+//      printf("Usage: main [option]\n"
+//             "\n"
+//             "The available options are as follows:\n"
+//             "\n"
+//             "\t-v , -verbose\tPrint memory allocation information.\n"
+//             "\n");
+//    }
+//  }
 
   return 0;
 }
