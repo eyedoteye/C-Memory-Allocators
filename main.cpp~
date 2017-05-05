@@ -465,7 +465,7 @@ ListTest()
 	{
 		V_PRINTF("[%i]:%u\tChar Deallocated\n", CharArrayIndex, *CharArray[CharArrayIndex]);
 		DeallocateSpaceOnList(&List, CharArray[CharArrayIndex]);
-		IF_VERBOSE(PrintFreeList(&List, 0));
+		IF_VERBOSE(PrintFreeList(&List));
 		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
 	V_PRINTF("\n\nInts:\n");
@@ -473,7 +473,7 @@ ListTest()
 	{
 		V_PRINTF("[%i]:%u\tInt Deallocated\n", IntArrayIndex, *IntArray[IntArrayIndex]);
 		DeallocateSpaceOnList(&List, IntArray[IntArrayIndex]);
-		IF_VERBOSE(PrintFreeList(&List, 0));
+		IF_VERBOSE(PrintFreeList(&List));
 		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
 	V_PRINTF("\n\nLongs:\n");
@@ -481,14 +481,14 @@ ListTest()
 	{
 		V_PRINTF("[%i]:%u\tLong Deallocated\n", LongArrayIndex, *LongArray[LongArrayIndex]);
 		DeallocateSpaceOnList(&List, LongArray[LongArrayIndex]);
-		IF_VERBOSE(PrintFreeList(&List, 0));
+		IF_VERBOSE(PrintFreeList(&List));
 		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
 
 	V_PRINTF("\nTotal Space Reserved: %zu\n", List.Memory.Size);
 	V_PRINTF("Space Remaining After Full Deallocating: %zu\n\n", List.SpaceRemaining);
 
-  IF_VERBOSE(PrintFreeList(&List, 0));
+  IF_VERBOSE(PrintFreeList(&List));
 }
 
 int
