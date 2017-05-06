@@ -87,15 +87,6 @@ PrintFreeList(list *List, size_t HighlightHeaderAddress)
 #endif
 #define V_PRINTF(...) IF_VERBOSE(printf(__VA_ARGS__))
 
-internal void
-SubtractLargeIntegers(
-  LARGE_INTEGER *X,
-  LARGE_INTEGER *Y,
-  LARGE_INTEGER *Difference)
-{
-  Difference->QuadPart = X->QuadPart - Y->QuadPart;
-}
-
 internal void 
 DivideLargeIntegers(
   LARGE_INTEGER *X,
@@ -106,25 +97,104 @@ DivideLargeIntegers(
   Quotient->QuadPart = X->QuadPart * Scale / Y->QuadPart;
 }
 
+global LARGE_INTEGER PrePerformanceCount, PostPerformanceCount;
+global LARGE_INTEGER AllocationPerformanceCount, DeallocationPerformanceCount;
+global int AllocationCount, DeallocationCount;
+
+internal void
+ComputeAndPrintAndResetMetrics()
+{
+  LARGE_INTEGER PerformanceCounterFrequency;
+  QueryPerformanceFrequency(&PerformanceCounterFrequency);
+
+  LARGE_INTEGER AllocationTimeInNS;
+  DivideLargeIntegers(&AllocationPerformanceCount, &PerformanceCounterFrequency,
+                      &AllocationTimeInNS,
+                      1000 * 1000);
+  LARGE_INTEGER DeallocationTimeInNS;
+  DivideLargeIntegers(&DeallocationPerformanceCount,
+                      &PerformanceCounterFrequency,
+                      &DeallocationTimeInNS,
+                      1000 * 1000);
+
+  printf("# Of Allocations: %i\n", AllocationCount);
+  printf("Total Allocation Time: %llins\n", AllocationTimeInNS.QuadPart);
+  printf("\t=> ~%fns Per Allocation\n",
+         AllocationTimeInNS.QuadPart / (long double)AllocationCount);
+  printf("# Of Deallocations: %i\n", DeallocationCount);
+  printf("Total Deallocation Time: %llins\n", DeallocationTimeInNS.QuadPart);
+  printf("\t=> ~%fns Per Deallocation\n",
+         DeallocationTimeInNS.QuadPart / (long double)DeallocationCount);
+
+  V_PRINTF("QueryPerformanceFrequency: %lli\n",
+         PerformanceCounterFrequency.QuadPart);
+
+  AllocationPerformanceCount.QuadPart = DeallocationPerformanceCount.QuadPart
+    = AllocationCount = DeallocationCount = 0; 
+}
+
+#define Metrics_AllocateSpaceOnStack(Stack, Type) \
+        Metrics_AllocateSpaceOnStack_(Stack, sizeof(Type), alignof(Type))
+internal void*
+Metrics_AllocateSpaceOnStack_(stack *Stack, size_t Size, short Alignment)
+{
+  QueryPerformanceCounter(&PrePerformanceCount);
+  void* Allocation = AllocateSpaceOnStack_(Stack, Size, Alignment);
+  QueryPerformanceCounter(&PostPerformanceCount);
+  AllocationPerformanceCount.QuadPart +=
+    PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
+  ++AllocationCount;
+  return Allocation;
+}
+
+#define Metrics_DeallocateSpaceOnStack(Stack, Type) \
+        Metrics_DeallocateSpaceOnStack_(Stack, sizeof(Type))
+
+internal void
+Metrics_DeallocateSpaceOnStack_(stack *Stack, size_t Size)
+{
+  QueryPerformanceCounter(&PrePerformanceCount);
+  DeallocateSpaceOnStack(Stack, Size);
+  QueryPerformanceCounter(&PostPerformanceCount);
+  DeallocationPerformanceCount.QuadPart +=
+    PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
+  ++DeallocationCount;
+}
+
+#define Metrics_AllocateSpaceOnList(Stack, Type) \
+        Metrics_AllocateSpaceOnList_(Stack, sizeof(Type), alignof(Type))
+internal void*
+Metrics_AllocateSpaceOnList_(list *List, size_t Size, unsigned char Alignment)
+{
+  QueryPerformanceCounter(&PrePerformanceCount);
+  void* Allocation = AllocateSpaceOnList_(List, Size, Alignment);
+  QueryPerformanceCounter(&PostPerformanceCount);
+  AllocationPerformanceCount.QuadPart +=
+    PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
+  ++AllocationCount;
+  return Allocation; 
+}
+
+internal void
+Metrics_DeallocateSpaceOnList(list *List, void* Address)
+{
+  QueryPerformanceCounter(&PrePerformanceCount);
+  DeallocateSpaceOnList(List, Address);
+  QueryPerformanceCounter(&PostPerformanceCount);
+  DeallocationPerformanceCount.QuadPart +=
+    PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
+  ++DeallocationCount;
+}
+
+
 #define TestCount 100
 internal void
 StackTest()
 {
-  LARGE_INTEGER PerformanceCounterFrequency;
-  LARGE_INTEGER OldTime;
-  LARGE_INTEGER NewTime;
-
-  QueryPerformanceFrequency(&PerformanceCounterFrequency);
-
   srand((unsigned int)time(NULL));
   stack Stack;
 
-  QueryPerformanceCounter(&OldTime);
   InitializeStack(&Stack, TestCount * (sizeof(long)+alignof(long)));
-  QueryPerformanceCounter(&NewTime);
-
-  LARGE_INTEGER StackInitializationTime;
-  SubtractLargeIntegers(&NewTime, &OldTime, &StackInitializationTime);
 
   char *CharArray[TestCount];
   int CharArraySize = 0;
@@ -141,8 +211,6 @@ StackTest()
   V_PRINTF("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
   V_PRINTF("Space Remaining : %u\n", Stack.SpaceRemaining);
 
-  QueryPerformanceCounter(&OldTime);
-
   for(int TestIndex = 0; TestIndex < TestCount; ++TestIndex)
   {
     int TestChoice = rand() % 3;
@@ -151,21 +219,21 @@ StackTest()
     {
       case 0:
       {
-        CharArray[CharArraySize] = (char *)AllocateSpaceOnStack(&Stack, char);
+        CharArray[CharArraySize] = (char *)Metrics_AllocateSpaceOnStack(&Stack, char);
         *CharArray[CharArraySize] = (char)(CharArraySize);
         ++CharArraySize;
         V_PRINTF("-Allocated(char) \t");
       } break;
       case 1:
       {
-        IntArray[IntArraySize] = (int *)AllocateSpaceOnStack(&Stack, int);
+        IntArray[IntArraySize] = (int *)Metrics_AllocateSpaceOnStack(&Stack, int);
         *IntArray[IntArraySize] = (int)(IntArraySize);
         ++IntArraySize;
         V_PRINTF("-Allocated(int) \t");
       } break;
       case 2:
       {
-        LongArray[LongArraySize] = (long *)AllocateSpaceOnStack(&Stack, long);
+        LongArray[LongArraySize] = (long *)Metrics_AllocateSpaceOnStack(&Stack, long);
         *LongArray[LongArraySize] = (long)(LongArraySize);
         ++LongArraySize;
         V_PRINTF("-Allocated(long) \t");
@@ -182,10 +250,6 @@ StackTest()
       V_PRINTF("Last Alignment Is Footer\n");
     }
   }
-
-  QueryPerformanceCounter(&NewTime);
-  LARGE_INTEGER StackAllocationTime;
-  SubtractLargeIntegers(&NewTime, &OldTime, &StackAllocationTime);
 
   IF_VERBOSE(
     V_PRINTF("\nChars:\n");
@@ -212,25 +276,23 @@ StackTest()
   V_PRINTF(Stack.LastAlignmentIsHeader ? "Last Alignment Is Header\n"
            : "Last Alignment Is Footer\n");
   
-  QueryPerformanceCounter(&OldTime);
-
   for(int TestIndex = TestCount - 1; TestIndex >= 0; --TestIndex)
   {
     switch(TestChoiceOrder[TestIndex])
     {
       case 0:
       {
-        DeallocateSpaceOnStack(&Stack, char);
+        Metrics_DeallocateSpaceOnStack(&Stack, char);
         V_PRINTF("-Deallocated(char)\t");
       } break;
       case 1:
       {
-        DeallocateSpaceOnStack(&Stack, int);
+        Metrics_DeallocateSpaceOnStack(&Stack, int);
         V_PRINTF("-Deallocated(int)\t");
       } break;
       case 2:
       {
-        DeallocateSpaceOnStack(&Stack, long);
+        Metrics_DeallocateSpaceOnStack(&Stack, long);
         V_PRINTF("-Deallocated(long)\t");
       } break;
     }
@@ -241,90 +303,9 @@ StackTest()
              : "Last Alignment Is Footer\n");
   }  
 
-  QueryPerformanceCounter(&NewTime);
-  LARGE_INTEGER StackDeallocationTime;
-  SubtractLargeIntegers(&NewTime, &OldTime, &StackDeallocationTime);
-
-  LARGE_INTEGER StackInitializationTimeInNS;
-  DivideLargeIntegers(&StackInitializationTime, &PerformanceCounterFrequency,
-                      &StackInitializationTimeInNS,
-                      1000 * 1000);
-  LARGE_INTEGER StackAllocationTimeInNS;
-  DivideLargeIntegers(&StackAllocationTime, &PerformanceCounterFrequency,
-                      &StackAllocationTimeInNS,
-                      1000 * 1000);
-  LARGE_INTEGER StackDeallocationTimeInNS;
-  DivideLargeIntegers(&StackDeallocationTime, &PerformanceCounterFrequency,
-                      &StackDeallocationTimeInNS,
-                      1000 * 1000);
-
-  printf("Stack Initialization Time: %llins\n",
-         StackInitializationTimeInNS.QuadPart); 
-  printf("Stack Allocation Time: %llins\n",
-         StackAllocationTimeInNS.QuadPart);
-  printf("Stack Deallocation Time: %llins\n",
-         StackDeallocationTimeInNS.QuadPart);
-  V_PRINTF("QueryPerformanceFrequency: %lli\n",
-         PerformanceCounterFrequency.QuadPart);
+  printf("Stack Allocator Metrics:\n");
+  ComputeAndPrintAndResetMetrics();
   printf("\n");
-}
-
-global LARGE_INTEGER PrePerformanceCount, PostPerformanceCount;
-global LARGE_INTEGER AllocationPerformanceCount, DeallocationPerformanceCount;
-global int AllocationCount, DeallocationCount;
-
-#define Diagnostic_AllocateSpaceOnList(Stack, Type) \
-        Diagnostic_AllocateSpaceOnList_(Stack, sizeof(Type), alignof(Type))
-internal void*
-Diagnostic_AllocateSpaceOnList_(list *List, size_t Size, unsigned char Alignment)
-{
-  QueryPerformanceCounter(&PrePerformanceCount);
-  void* Allocation = AllocateSpaceOnList_(List, Size, Alignment);
-  QueryPerformanceCounter(&PostPerformanceCount);
-  AllocationPerformanceCount.QuadPart +=
-    PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
-  ++AllocationCount;
-  return Allocation; 
-}
-
-internal void
-Diagnostic_DeallocateSpaceOnList(list *List, void* Address)
-{
-  QueryPerformanceCounter(&PrePerformanceCount);
-  DeallocateSpaceOnList(List, Address);
-  QueryPerformanceCounter(&PostPerformanceCount);
-  DeallocationPerformanceCount.QuadPart +=
-    PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
-  ++DeallocationCount;
-}
-
-internal void
-ComputeAndPrintMetrics()
-{
-  LARGE_INTEGER PerformanceCounterFrequency;
-  QueryPerformanceFrequency(&PerformanceCounterFrequency);
-
-  LARGE_INTEGER AllocationTimeInNS;
-  DivideLargeIntegers(&AllocationPerformanceCount, &PerformanceCounterFrequency,
-                      &AllocationTimeInNS,
-                      1000 * 1000);
-  LARGE_INTEGER DeallocationTimeInNS;
-  DivideLargeIntegers(&DeallocationPerformanceCount,
-                      &PerformanceCounterFrequency,
-                      &DeallocationTimeInNS,
-                      1000 * 1000);
-
-  printf("# Of Allocations: %i\n", AllocationCount);
-  printf("Total Allocation Time: %llins\n", AllocationTimeInNS.QuadPart);
-  printf("\t=> ~%fns Per Allocation\n",
-         AllocationTimeInNS.QuadPart / (long double)AllocationCount);
-  printf("# Of Deallocations: %i\n", DeallocationCount);
-  printf("Total Deallocation Time: %llins\n", DeallocationTimeInNS.QuadPart);
-  printf("\t=> ~%fns Per Deallocation\n",
-         DeallocationTimeInNS.QuadPart / (long double)DeallocationCount);
-
-  V_PRINTF("QueryPerformanceFrequency: %lli\n",
-         PerformanceCounterFrequency.QuadPart);
 }
 
 internal void
@@ -360,7 +341,7 @@ ListTest()
 				if(Allocate || CharArraySize == 0)
 				{
 					CharArray[CharArraySize] =
-            (unsigned char *)Diagnostic_AllocateSpaceOnList(&List, char);
+            (unsigned char *)Metrics_AllocateSpaceOnList(&List, char);
 					if(CharArray[CharArraySize] == NULL) {
 						V_PRINTF("Cannot Allocate Char! Memory Full!\n");
 						break;
@@ -383,7 +364,7 @@ ListTest()
                    CharArraySize,
                    *CharArray[CharArraySize],
                    (size_t)CharArray[CharArraySize]);
-					Diagnostic_DeallocateSpaceOnList(&List, CharArray[CharArraySize]);
+					Metrics_DeallocateSpaceOnList(&List, CharArray[CharArraySize]);
 				}
 			} break;
 			case 1:
@@ -391,7 +372,7 @@ ListTest()
 				if(Allocate || IntArraySize == 0)
 				{
 					IntArray[IntArraySize] =
-            (unsigned int *)Diagnostic_AllocateSpaceOnList(&List, int);
+            (unsigned int *)Metrics_AllocateSpaceOnList(&List, int);
 					if(IntArray[IntArraySize] == NULL) {
 						V_PRINTF("Cannot Allocate Int! Memory Full!\n");
 						break;
@@ -412,7 +393,7 @@ ListTest()
                    IntArraySize,
                    *IntArray[IntArraySize],
                    (size_t)IntArray[IntArraySize]);
-					Diagnostic_DeallocateSpaceOnList(&List, IntArray[IntArraySize]);
+					Metrics_DeallocateSpaceOnList(&List, IntArray[IntArraySize]);
 				}
 			} break;
 			case 2:
@@ -420,7 +401,7 @@ ListTest()
 				if(Allocate || LongArraySize == 0)
 				{
 					LongArray[LongArraySize] =
-            (unsigned long *)Diagnostic_AllocateSpaceOnList(&List, long);
+            (unsigned long *)Metrics_AllocateSpaceOnList(&List, long);
 					if(LongArray[LongArraySize] == NULL) {
 						V_PRINTF("Cannot Allocate Long! Memory Full!\n");
 						break;
@@ -442,7 +423,7 @@ ListTest()
                    LongArraySize,
                    *LongArray[LongArraySize],
                    (size_t)LongArray[LongArraySize]);
-					Diagnostic_DeallocateSpaceOnList(&List, LongArray[LongArraySize]);
+					Metrics_DeallocateSpaceOnList(&List, LongArray[LongArraySize]);
 				}
 			} break;
 		}
@@ -524,7 +505,7 @@ ListTest()
 	for(int CharArrayIndex = 0; CharArrayIndex < CharArraySize; ++CharArrayIndex)
 	{
 		V_PRINTF("[%i]:%u\tChar Deallocated\n", CharArrayIndex, *CharArray[CharArrayIndex]);
-		Diagnostic_DeallocateSpaceOnList(&List, CharArray[CharArrayIndex]);
+		Metrics_DeallocateSpaceOnList(&List, CharArray[CharArrayIndex]);
 		IF_VERBOSE(PrintFreeList(&List, 0));
 		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
@@ -532,7 +513,7 @@ ListTest()
 	for(int IntArrayIndex = 0; IntArrayIndex < IntArraySize; ++IntArrayIndex)
 	{
 		V_PRINTF("[%i]:%u\tInt Deallocated\n", IntArrayIndex, *IntArray[IntArrayIndex]);
-		Diagnostic_DeallocateSpaceOnList(&List, IntArray[IntArrayIndex]);
+		Metrics_DeallocateSpaceOnList(&List, IntArray[IntArrayIndex]);
 		IF_VERBOSE(PrintFreeList(&List, 0));
 		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
@@ -540,7 +521,7 @@ ListTest()
 	for(int LongArrayIndex = 0; LongArrayIndex < LongArraySize; ++LongArrayIndex)
 	{
 		V_PRINTF("[%i]:%u\tLong Deallocated\n", LongArrayIndex, *LongArray[LongArrayIndex]);
-		Diagnostic_DeallocateSpaceOnList(&List, LongArray[LongArrayIndex]);
+		Metrics_DeallocateSpaceOnList(&List, LongArray[LongArrayIndex]);
 		IF_VERBOSE(PrintFreeList(&List, 0));
 		V_PRINTF("Space Remaining: %zu\n", List.SpaceRemaining);
 	}
@@ -551,7 +532,8 @@ ListTest()
   IF_VERBOSE(PrintFreeList(&List, 0));
 
   printf("List Allocator Metrics:\n");
-  ComputeAndPrintMetrics();
+  ComputeAndPrintAndResetMetrics();
+  printf("\n");
 }
 
 int
