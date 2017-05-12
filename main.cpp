@@ -141,9 +141,14 @@ Metrics_AllocateSpaceOnStack_(stack *Stack, size_t Size, short Alignment)
   QueryPerformanceCounter(&PrePerformanceCount);
   void* Allocation = AllocateSpaceOnStack_(Stack, Size, Alignment);
   QueryPerformanceCounter(&PostPerformanceCount);
-  AllocationPerformanceCount.QuadPart +=
-    PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
-  ++AllocationCount;
+
+  if(Allocation != NULL)
+  {
+    AllocationPerformanceCount.QuadPart +=
+      PostPerformanceCount.QuadPart - PrePerformanceCount.QuadPart;
+    ++AllocationCount;
+  }
+
   return Allocation;
 }
 
@@ -186,97 +191,114 @@ Metrics_DeallocateSpaceOnList(list *List, void* Address)
   ++DeallocationCount;
 }
 
-
-#define TestCount 100
-internal void
-StackTest()
+struct char_pile
 {
+  char* Pile;
+  int Size;
+};
+
+#define boolint int
+
+internal void
+StackTest(int AllocationSizeInChars, int TestCount)
+{ 
   srand((unsigned int)time(NULL));
   stack Stack;
 
-  InitializeStack(&Stack, TestCount * (sizeof(long)+alignof(long)));
+  InitializeStack(&Stack, AllocationSizeInChars * sizeof(char));
 
-  char *CharArray[TestCount];
-  int CharArraySize = 0;
-  
-  int *IntArray[TestCount];
-  int IntArraySize = 0;
-
-  long *LongArray[TestCount];
-  int LongArraySize = 0;
-
-  int TestChoiceOrder[TestCount];
+#define PILE_COUNT 100
+  char_pile CharPiles[PILE_COUNT];
 
   V_PRINTF("Stack Allocation Starting\n");
   V_PRINTF("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
   V_PRINTF("Space Remaining : %u\n", Stack.SpaceRemaining);
 
-  for(int TestIndex = 0; TestIndex < TestCount; ++TestIndex)
+  int TopOfPileIndex = 0;
+  for(int Iteration = 0; Iteration < TestCount; ++Iteration)
   {
-    int TestChoice = rand() % 3;
-    TestChoiceOrder[TestIndex] = TestChoice;
-    switch(TestChoice)
+
+    boolint Push = rand() % 2;
+    if(Push && Stack.SpaceRemaining)
     {
-      case 0:
+      int CharCount = (rand() % Stack.SpaceRemaining - 1) + 1;
+      if(CharCount == 0)
+        break;
+
+      char_pile *TopPile = &CharPiles[TopOfPileIndex];
+
+      TopPile->Pile = 
+        (char *)Metrics_AllocateSpaceOnStack_(&Stack,
+                                              sizeof(char) * CharCount,
+                                              alignof(char)); 
+      if(TopPile->Pile != NULL)
       {
-        CharArray[CharArraySize] = (char *)Metrics_AllocateSpaceOnStack(&Stack, char);
-        *CharArray[CharArraySize] = (char)(CharArraySize);
-        ++CharArraySize;
-        V_PRINTF("-Allocated(char) \t");
-      } break;
-      case 1:
-      {
-        IntArray[IntArraySize] = (int *)Metrics_AllocateSpaceOnStack(&Stack, int);
-        *IntArray[IntArraySize] = (int)(IntArraySize);
-        ++IntArraySize;
-        V_PRINTF("-Allocated(int) \t");
-      } break;
-      case 2:
-      {
-        LongArray[LongArraySize] = (long *)Metrics_AllocateSpaceOnStack(&Stack, long);
-        *LongArray[LongArraySize] = (long)(LongArraySize);
-        ++LongArraySize;
-        V_PRINTF("-Allocated(long) \t");
-      } break;
+        TopPile->Size = CharCount; 
+        ++TopOfPileIndex;
+
+        IF_VERBOSE(
+          V_PRINTF("Allocated Char Pile: %d Chars\n", CharCount);
+          V_PRINTF("  ");
+          for(int CharIndex = 0; CharIndex < CharCount; ++CharIndex)
+          {
+            if(CharIndex % 10 == 9) 
+              V_PRINTF("\n  ");
+
+            V_PRINTF("%d\t", *(TopPile->Pile + CharIndex));
+          }
+          V_PRINTF("\n");
+        )
+      }  
+      IF_VERBOSE(
+        else
+        {
+          V_PRINTF("Allocation Failure: %d Chars\n", CharCount); 
+          V_PRINTF("  Stack SpaceRemaining: %u Bytes\n", Stack.SpaceRemaining);
+        }
+      )
     }
-    V_PRINTF("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
-    V_PRINTF("Space Remaining : %u\t", Stack.SpaceRemaining);
-    if(Stack.LastAlignmentIsHeader)
+    else if(TopOfPileIndex > 0)
     {
-      V_PRINTF("Last Alignment Is Header\n");
+      char_pile *TopPile = &CharPiles[TopOfPileIndex - 1]; 
+      Metrics_DeallocateSpaceOnStack_(&Stack, TopPile->Size * sizeof(char));
+      --TopOfPileIndex;
+
+      //Note: Deallocation Needs Undefined Behavior Work
+      V_PRINTF("Deallocation Successful: %d Chars\n", TopPile->Size);
+      IF_VERBOSE(
+        for(int CharIndex = 0; CharIndex < TopPile->Size; ++CharIndex)
+        {
+          if(CharIndex % 10 == 9) 
+            V_PRINTF("\n  ");
+
+          V_PRINTF("%d\t", *(TopPile->Pile + CharIndex));
+        }
+        V_PRINTF("\n");
+      )
     }
-    else
-    {
-      V_PRINTF("Last Alignment Is Footer\n");
-    }
+
+    IF_VERBOSE(
+      V_PRINTF("Current Top Address: %zu\t", (size_t)Stack.TopOfMemory);
+      V_PRINTF("Space Remaining : %u\t", Stack.SpaceRemaining);
+      if(Stack.LastAlignmentIsHeader)
+      {
+        V_PRINTF("Last Alignment Is Header\n");
+      }
+      else
+      {
+        V_PRINTF("Last Alignment Is Footer\n");
+      }
+    )
   }
 
-  IF_VERBOSE(
-    V_PRINTF("\nChars:\n");
-    for(int CharArrayIndex = 0; CharArrayIndex < CharArraySize; ++CharArrayIndex)
-    {
-      V_PRINTF("[%i]:%d\t", CharArrayIndex, *CharArray[CharArrayIndex]);
-    }
-    V_PRINTF("\n\nInts:\n");
-    for(int IntArrayIndex = 0; IntArrayIndex < IntArraySize; ++IntArrayIndex)
-    {
-      V_PRINTF("[%i]:%d\t", IntArrayIndex, *IntArray[IntArrayIndex]);
-    }
-    V_PRINTF("\n\nLongs:\n");
-    for(int LongArrayIndex = 0; LongArrayIndex < LongArraySize; ++LongArrayIndex)
-    {
-      V_PRINTF("[%i]:%d\t", LongArrayIndex, *LongArray[LongArrayIndex]);
-    }
-    V_PRINTF("\n\n");
-  )
-
+#if 0
   V_PRINTF("Stack Deallocation Starting\n");
   V_PRINTF("\t\t\tCurrent Top Address: %zu\t", (size_t)Stack.TopOfMemory);
   V_PRINTF("Space Remaining : %u\t", Stack.SpaceRemaining);
   V_PRINTF(Stack.LastAlignmentIsHeader ? "Last Alignment Is Header\n"
            : "Last Alignment Is Footer\n");
   
-  for(int TestIndex = TestCount - 1; TestIndex >= 0; --TestIndex)
+  for(int TestIndex = AllocationSize - 1; TestIndex >= 0; --TestIndex)
   {
     switch(TestChoiceOrder[TestIndex])
     {
@@ -302,33 +324,35 @@ StackTest()
     V_PRINTF(Stack.LastAlignmentIsHeader ? "Last Alignment Is Header\n"
              : "Last Alignment Is Footer\n");
   }  
+#endif
 
   printf("Stack Allocator Metrics:\n");
   ComputeAndPrintAndResetMetrics();
   printf("\n");
 }
 
+#define AllocationSize 10
 internal void
 ListTest()
 {
 	list List;
-	InitializeList(&List, TestCount * (sizeof(long) + alignof(long)) * 2);
+	InitializeList(&List, AllocationSize * (sizeof(long) + alignof(long)) * 2);
 
 	V_PRINTF("Total Space Allocated: %zubytes\n", List.Memory.Size);
 
-	unsigned char *CharArray[TestCount];
+	unsigned char *CharArray[AllocationSize];
 	int CharArraySize = 0;
 
-	unsigned int *IntArray[TestCount];
+	unsigned int *IntArray[AllocationSize];
 	int IntArraySize = 0;
 
-	unsigned long *LongArray[TestCount];
+	unsigned long *LongArray[AllocationSize];
 	int LongArraySize = 0;
 
   V_PRINTF("List Allocation Starting\n");
 	V_PRINTF("List Address Start: %zu\n", (size_t)List.Memory.AllocatedSpace);
 
-	for(int TestIndex = 0; TestIndex < TestCount * 2; ++TestIndex)
+	for(int TestIndex = 0; TestIndex < AllocationSize * 2; ++TestIndex)
 	{
 		int TestChoice = rand() % 3;
 		bool Allocate = rand() % 2 == 1;
@@ -542,8 +566,8 @@ main(int argv, char** argc)
 //  {
 //    case 1:
 //    {
-StackTest();
-ListTest();
+StackTest(1000, 1000);
+//ListTest();
 //    } break;
 //    case 2:
 //    {
