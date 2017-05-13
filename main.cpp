@@ -224,7 +224,7 @@ StackTest(int AllocationSizeInChars, int TestCount)
   {
 
     boolint Push = rand() % 2;
-    if(Push && Stack.SpaceRemaining)
+    if(Push && NextFreePileIndex < PILE_COUNT && Stack.SpaceRemaining)
     {
       int CharCount = (rand() % Stack.SpaceRemaining - 1) + 1;
 
@@ -317,7 +317,7 @@ ListTest(int AllocationSizeInChars, int TestCount)
     IF_VERBOSE(size_t HighlightAddress = 0;)
 
     boolint Allocate = rand() % 2;
-    if(Allocate && NextFreePileIndex < PILE_COUNT && List.SpaceRemaining > 0)
+    if(Allocate && NextFreePileIndex < PILE_COUNT && List.SpaceRemaining)
     {
       int CharCount = (rand() % List.SpaceRemaining -  1) + 1;
 
