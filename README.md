@@ -36,7 +36,7 @@ void InitializeList(list *List, size_t Size);
 void* AllocateSpaceOnList_(list *List, size_t Size, unsigned char Alignment);
 void* AllocateSpaceOnList(List, Type);
       // ^ List, sizeof(Type), alignof(Type) are passed along to the previous
-function.
+      // function.
 void DeallocateSpaceOnList_(list *List, void* Address);
 ```
 ### Notes
