@@ -225,8 +225,8 @@ FindAndResizeFittingChunkFromList(
   return (void *)(AllocatedChunkAddress);
 }
 
-#define AllocateSpaceOnList(Stack, Type) \
-        AllocateSpaceOnList_(Stack, sizeof(Type), alignof(Type))
+#define AllocateSpaceOnList(List, Type) \
+        AllocateSpaceOnList_(List, sizeof(Type), alignof(Type))
           
 internal void*
 AllocateSpaceOnList_(list *List, size_t Size, unsigned char Alignment)
