@@ -95,7 +95,7 @@ int main(int argv, char** argc)
   }
   else
   {
-    printf("Usage: main [option <value>]\n"
+    printf("Usage:./test.exe [option <value>]\n"
            "\n"
            "The available options are as follows:\n"
            "\n"
