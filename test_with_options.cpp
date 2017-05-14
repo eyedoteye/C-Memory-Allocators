@@ -56,6 +56,8 @@ int main(int argv, char** argc)
     else
     {
       printf("Error: unknown option %s\n", Arg);
+      TestCount = -1;
+      MemSize = -1;
     }
   }
 
