@@ -382,36 +382,19 @@ ListTest(int AllocationSizeInChars, int TestCount)
   printf("\n");
 }
 
+#include <string.h>
+#include <stdlib.h>
+
 int
 main(int argv, char** argc)
 {
-//  {
-//    case 1:
-//    {
-srand((unsigned int)time(NULL));
-StackTest(100, 1000);
-ListTest(100, 1000);
-//    } break;
-//    case 2:
-//    {
-//      if (strcmp("-verbose", argc[1]) == 0 ||
-//          strcmp("-v", argc[1]) == 0)
-//      {
-//        RunTestsVerbose();
-//        break;
-//      }
-//    } // Note: Intentional pass
-//    default: 
-//    {
-//      printf("Error: unknown option %s\n", argc[1]);
-//      printf("Usage: main [option]\n"
-//             "\n"
-//             "The available options are as follows:\n"
-//             "\n"
-//             "\t-v , -verbose\tPrint memory allocation information.\n"
-//             "\n");
-//    }
-//  }
+  srand((unsigned int)time(NULL));
+
+  int AllocationSizeInChars = strtol(argc[1], NULL, 10) / sizeof(char);
+  int TestCount = strtol(argc[2], NULL, 10);
+
+  StackTest(AllocationSizeInChars, TestCount);
+  ListTest(AllocationSizeInChars, TestCount);
 
   return 0;
 }
