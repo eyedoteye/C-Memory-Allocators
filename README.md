@@ -15,7 +15,7 @@ void InitializeStack(stack *Stack, size_t Size);
 void* AllocateSpaceOnStack_(stack *Stack, size_t Size, short Alignment);
 void* AllocateSpaceOnStack(Stack, Type);
       // ^ Stack, sizeof(Type), alignof(Type) are passed along to the previous
-function.
+      // function.
 void DeallocateSpaceOnStack_(stack *Stack, size_t Size);
 void DeallocateSpaceOnStack(Stack, Type);
      // ^ Stack, sizeof(Type) are passed along to the previous function.
