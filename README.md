@@ -1,4 +1,4 @@
--Memory-Allocators
+C-Memory-Allocators
 ===================
 A pair of memory allocators, stack & list, allowing for a more rapid and
 spacially conservant way of distributing memory within a program. This project
