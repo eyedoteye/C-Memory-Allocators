@@ -65,9 +65,8 @@ The available options are as follows:
 
 Motivation
 ----------
-I was first introduced to memory allocators during my batch at the Recurse
-Center where I was encouraged and coerced into exploring a deeper level
-of game programming by, my now excellent friend, Mariano (seriously,
+I have to thank my good friend Mariano for encouraging and coercing
+me to explore game programming at a deeper level (seriously,
 [check him out](https://github.com/mtrebi), he's super cool).
 I'm ever thankful of the time we spent scratching our heads and drawing
 _advanced rectangles_ on white boards.
